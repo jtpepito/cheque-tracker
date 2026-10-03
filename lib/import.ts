@@ -1,9 +1,8 @@
 import "server-only";
-import fs from "node:fs";
-import type { DatabaseSync } from "node:sqlite";
 import { getCompanyNames, listCheques, setCompanyNames, upsertCheque } from "./cheques";
-import { isValidDate, todayManila } from "./dates";
+import { isValidDate } from "./dates";
 import { parseAmount, peso, sumAmounts } from "./money";
+import type { Sql } from "./sql";
 import { COMPANIES, isCompany, isStatus, type Cheque, type CompanyNames } from "./types";
 
 export type ImportFile = { companies?: Partial<CompanyNames>; cheques: Array<Record<string, unknown>> };
@@ -51,8 +50,8 @@ function toCheque(raw: Record<string, unknown>, index: number): Cheque {
 }
 
 /** Count and total of the whole register, then per company, for checking against the source. */
-function summarize(db: DatabaseSync): string {
-  const all = listCheques(db);
+async function summarize(sql: Sql): Promise<string> {
+  const all = await listCheques(sql);
   const part = (label: string, list: Cheque[]) =>
     `${label}${list.length} ${list.length === 1 ? "cheque" : "cheques"}, ${peso(sumAmounts(list.map((c) => c.amount)))}`;
   const per = COMPANIES.map((co) => {
@@ -63,42 +62,20 @@ function summarize(db: DatabaseSync): string {
 }
 
 /** Inserts or replaces every cheque in the file by id. All or nothing. */
-export function importCheques(db: DatabaseSync, file: ImportFile): { count: number; summary: string } {
+export async function importCheques(sql: Sql, file: ImportFile): Promise<{ count: number; summary: string }> {
   if (!Array.isArray(file.cheques)) throw new Error('The import file needs a "cheques" list.');
   const cheques = file.cheques.map(toCheque);
   for (const [key, name] of Object.entries(file.companies ?? {})) {
     if (typeof name !== "string" || !name.trim()) throw new Error(`Bad company name for "${key}" in the import file.`);
   }
-  db.exec("BEGIN");
-  try {
+  await sql.tx(async (t) => {
     // The file wins for everything except a company chosen by hand in the app.
-    const locked = new Map(listCheques(db).filter((c) => c.companyLocked).map((c) => [c.id, c]));
+    const locked = new Map((await listCheques(t)).filter((c) => c.companyLocked).map((c) => [c.id, c]));
     for (const c of cheques) {
       const keep = locked.get(c.id);
-      upsertCheque(db, keep ? { ...c, company: keep.company, companyBasis: keep.companyBasis, companyLocked: true } : c);
+      await upsertCheque(t, keep ? { ...c, company: keep.company, companyBasis: keep.companyBasis, companyLocked: true } : c);
     }
-    if (file.companies) setCompanyNames(db, { ...getCompanyNames(db), ...file.companies });
-    db.exec("COMMIT");
-  } catch (err) {
-    db.exec("ROLLBACK");
-    throw err;
-  }
-  return { count: cheques.length, summary: summarize(db) };
-}
-
-/**
- * Loads the file if it exists. It is renamed first, so a file that cannot be renamed is never
- * loaded (and so never loaded again on every restart); if its contents are bad it is put back
- * under its own name to be fixed and retried.
- */
-export function importIfPresent(db: DatabaseSync, jsonPath: string): { count: number; summary: string } | null {
-  if (!fs.existsSync(jsonPath)) return null;
-  const done = jsonPath.replace(/\.json$/, `.imported-${todayManila()}.json`);
-  fs.renameSync(jsonPath, done);
-  try {
-    return importCheques(db, JSON.parse(fs.readFileSync(done, "utf8")) as ImportFile);
-  } catch (err) {
-    fs.renameSync(done, jsonPath);
-    throw err;
-  }
+    if (file.companies) await setCompanyNames(t, { ...(await getCompanyNames(t)), ...file.companies });
+  });
+  return { count: cheques.length, summary: await summarize(sql) };
 }

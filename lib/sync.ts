@@ -1,8 +1,8 @@
 import "server-only";
-import type { DatabaseSync } from "node:sqlite";
-import { listCheques, removeCheque, upsertCheque } from "./cheques";
+import { deleteConfig, getConfigJson, listCheques, removeCheque, setConfig, upsertCheque } from "./cheques";
 import { deriveCompany, type SiRefs } from "./company-rules";
 import { readRow, type ReadRow, type RowProblem, type SheetRow } from "./sheet-rows";
+import type { Sql } from "./sql";
 import type { Cheque } from "./types";
 
 // One sync from the Google Sheet: the whole Check Issuances tab, applied in one transaction.
@@ -28,6 +28,13 @@ export class SyncRefused extends Error {
     message: string,
   ) {
     super(message);
+  }
+}
+
+/** Thrown inside the transaction to roll a dry run back while keeping its report. */
+class DryRunDone extends Error {
+  constructor(public report: SyncReport) {
+    super("dry run");
   }
 }
 
@@ -65,7 +72,7 @@ function sameContent(a: Cheque, b: Cheque): boolean {
   );
 }
 
-export function applySync(db: DatabaseSync, payload: SyncPayload, now: number = Date.now()): SyncReport {
+export async function applySync(sql: Sql, payload: SyncPayload, now: number = Date.now()): Promise<SyncReport> {
   const problems: RowProblem[] = [];
   const good = new Map<string, ReadRow>();
   payload.rows.forEach((raw, index) => {
@@ -77,93 +84,82 @@ export function applySync(db: DatabaseSync, payload: SyncPayload, now: number = 
   });
   if (good.size === 0) throw new SyncRefused(400, "The sheet sent no cheque rows that could be read. Nothing was changed.");
 
-  const existing = new Map(listCheques(db).map((c) => [c.id, c]));
   // A known cheque whose row cannot be read keeps its last good values; it is not removed.
   const unreadable = new Set(problems.map((p) => p.id));
-  const report: SyncReport = {
-    at: now,
-    dryRun: payload.dryRun,
-    rows: payload.rows.length,
-    added: 0,
-    changed: 0,
-    removed: 0,
-    unchanged: 0,
-    problems,
-  };
 
-  db.exec("BEGIN");
   try {
-    for (const r of good.values()) {
-      const old = existing.get(r.id);
-      const derived = deriveCompany(r.chequeNo, r.payee, payload.siRefs);
-      const next: Cheque = {
-        id: r.id,
-        company: old?.companyLocked ? old.company : derived.company,
-        chequeNo: r.chequeNo,
-        payee: r.payee,
-        amount: r.amount,
-        issueDate: r.issueDate,
-        encodedDate: r.encodedDate,
-        bankAccount: old?.bankAccount ?? "",
-        particulars: r.particulars,
-        status: r.status,
-        createdAt: old?.createdAt ?? now,
-        imported: true,
-        companyBasis: old?.companyLocked ? old.companyBasis : derived.basis,
-        sourceRow: r.row,
-        companyLocked: old?.companyLocked ?? false,
+    return await sql.tx(async (t) => {
+      const existing = new Map((await listCheques(t)).map((c) => [c.id, c]));
+      const report: SyncReport = {
+        at: now,
+        dryRun: payload.dryRun,
+        rows: payload.rows.length,
+        added: 0,
+        changed: 0,
+        removed: 0,
+        unchanged: 0,
+        problems,
       };
-      if (!old) report.added += 1;
-      else if (sameContent(old, next)) report.unchanged += 1;
-      else report.changed += 1;
-      if (!old || !sameContent(old, next) || old.sourceRow !== next.sourceRow || !old.imported) upsertCheque(db, next);
-    }
 
-    const gone = [...existing.values()].filter((c) => c.imported && !good.has(c.id) && !unreadable.has(c.id));
-    if (gone.length > MAX_REMOVALS && !payload.allowRemovals) {
-      throw new SyncRefused(
-        409,
-        `This sync would remove ${gone.length} cheques, which is more than ${MAX_REMOVALS}. Nothing was changed. ` +
-          `If the rows were deleted on purpose, use "Sync now, allowing removals".`,
-      );
-    }
-    for (const c of gone) removeCheque(db, c.id);
-    report.removed = gone.length;
+      for (const r of good.values()) {
+        const old = existing.get(r.id);
+        const derived = deriveCompany(r.chequeNo, r.payee, payload.siRefs);
+        const next: Cheque = {
+          id: r.id,
+          company: old?.companyLocked ? old.company : derived.company,
+          chequeNo: r.chequeNo,
+          payee: r.payee,
+          amount: r.amount,
+          issueDate: r.issueDate,
+          encodedDate: r.encodedDate,
+          bankAccount: old?.bankAccount ?? "",
+          particulars: r.particulars,
+          status: r.status,
+          createdAt: old?.createdAt ?? now,
+          imported: true,
+          companyBasis: old?.companyLocked ? old.companyBasis : derived.basis,
+          sourceRow: r.row,
+          companyLocked: old?.companyLocked ?? false,
+        };
+        if (!old) report.added += 1;
+        else if (sameContent(old, next)) report.unchanged += 1;
+        else report.changed += 1;
+        if (!old || !sameContent(old, next) || old.sourceRow !== next.sourceRow || !old.imported) await upsertCheque(t, next);
+      }
 
-    if (payload.dryRun) db.exec("ROLLBACK");
-    else {
-      db.prepare(
-        "INSERT INTO config (key, value) VALUES ('last_sync', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-      ).run(JSON.stringify(report));
-      db.prepare("DELETE FROM config WHERE key = 'last_sync_refusal'").run();
-      db.exec("COMMIT");
-    }
+      const gone = [...existing.values()].filter((c) => c.imported && !good.has(c.id) && !unreadable.has(c.id));
+      if (gone.length > MAX_REMOVALS && !payload.allowRemovals) {
+        throw new SyncRefused(
+          409,
+          `This sync would remove ${gone.length} cheques, which is more than ${MAX_REMOVALS}. Nothing was changed. ` +
+            `If the rows were deleted on purpose, use "Sync now, allowing removals".`,
+        );
+      }
+      for (const c of gone) await removeCheque(t, c.id);
+      report.removed = gone.length;
+
+      if (payload.dryRun) throw new DryRunDone(report);
+      await setConfig(t, "last_sync", JSON.stringify(report));
+      await deleteConfig(t, "last_sync_refusal");
+      return report;
+    });
   } catch (err) {
-    try {
-      db.exec("ROLLBACK");
-    } catch {
-      // Already rolled back; keep the original error.
-    }
+    if (err instanceof DryRunDone) return err.report;
     throw err;
   }
-  return report;
 }
 
 export type SyncRefusal = { at: number; message: string };
 
 /** Remembered so the page can say why the sheet's changes are not arriving. Cleared by the next real sync. */
-export function recordRefusal(db: DatabaseSync, message: string, now: number = Date.now()): void {
-  db.prepare(
-    "INSERT INTO config (key, value) VALUES ('last_sync_refusal', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-  ).run(JSON.stringify({ at: now, message }));
+export async function recordRefusal(sql: Sql, message: string, now: number = Date.now()): Promise<void> {
+  await setConfig(sql, "last_sync_refusal", JSON.stringify({ at: now, message }));
 }
 
-export function getLastRefusal(db: DatabaseSync): SyncRefusal | null {
-  const row = db.prepare("SELECT value FROM config WHERE key = 'last_sync_refusal'").get() as { value: string } | undefined;
-  return row ? (JSON.parse(row.value) as SyncRefusal) : null;
+export function getLastRefusal(sql: Sql): Promise<SyncRefusal | null> {
+  return getConfigJson<SyncRefusal>(sql, "last_sync_refusal");
 }
 
-export function getLastSync(db: DatabaseSync): SyncReport | null {
-  const row = db.prepare("SELECT value FROM config WHERE key = 'last_sync'").get() as { value: string } | undefined;
-  return row ? (JSON.parse(row.value) as SyncReport) : null;
+export function getLastSync(sql: Sql): Promise<SyncReport | null> {
+  return getConfigJson<SyncReport>(sql, "last_sync");
 }

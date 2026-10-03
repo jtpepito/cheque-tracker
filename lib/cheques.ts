@@ -1,6 +1,6 @@
 import "server-only";
-import type { DatabaseSync } from "node:sqlite";
 import type { Holiday } from "./banking";
+import type { Sql } from "./sql";
 import { DEFAULT_COMPANY_NAMES, type Cheque, type Company, type CompanyNames, type Status } from "./types";
 
 export class ChequeError extends Error {
@@ -14,105 +14,108 @@ export class ChequeError extends Error {
 
 type Row = Record<string, unknown>;
 
+// Postgres returns numeric and bigint as text; convert here so the rest of the app sees numbers.
 function toCheque(r: Row): Cheque {
   return {
     id: r.id as string,
     company: r.company as Company,
     chequeNo: r.cheque_no as string,
     payee: r.payee as string,
-    amount: (r.amount as number | null) ?? null,
+    amount: r.amount == null ? null : Number(r.amount),
     issueDate: r.issue_date as string,
     encodedDate: (r.encoded_date as string | null) ?? null,
     bankAccount: r.bank_account as string,
     particulars: r.particulars as string,
     status: r.status as Status,
     createdAt: Number(r.created_at),
-    imported: Number(r.imported) === 1,
+    imported: r.imported === true,
     companyBasis: (r.company_basis as string | null) ?? null,
     sourceRow: r.source_row == null ? null : Number(r.source_row),
-    companyLocked: Number(r.company_locked) === 1,
+    companyLocked: r.company_locked === true,
   };
 }
 
-export function listCheques(db: DatabaseSync): Cheque[] {
-  return (db.prepare("SELECT * FROM cheques ORDER BY issue_date, cheque_no").all() as Row[]).map(toCheque);
-}
-
-function getCheque(db: DatabaseSync, id: string): Cheque {
-  const row = db.prepare("SELECT * FROM cheques WHERE id = ?").get(id) as Row | undefined;
-  if (!row) throw new ChequeError("not_found", "This cheque no longer exists. Refresh the page.");
-  return toCheque(row);
+export async function listCheques(sql: Sql): Promise<Cheque[]> {
+  return (await sql.query<Row>("SELECT * FROM cheques ORDER BY issue_date, cheque_no")).map(toCheque);
 }
 
 /** Inserts the cheque, or replaces every field of the row with the same id. */
-export function upsertCheque(db: DatabaseSync, c: Cheque): void {
-  db.prepare(
+export async function upsertCheque(sql: Sql, c: Cheque): Promise<void> {
+  await sql.query(
     `INSERT INTO cheques (id, company, cheque_no, payee, amount, issue_date, encoded_date, bank_account,
                           particulars, status, created_at, imported, company_basis, source_row, company_locked)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(id) DO UPDATE SET
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+     ON CONFLICT (id) DO UPDATE SET
        company = excluded.company, cheque_no = excluded.cheque_no, payee = excluded.payee,
        amount = excluded.amount, issue_date = excluded.issue_date, encoded_date = excluded.encoded_date,
        bank_account = excluded.bank_account, particulars = excluded.particulars, status = excluded.status,
        created_at = excluded.created_at, imported = excluded.imported,
        company_basis = excluded.company_basis, source_row = excluded.source_row,
        company_locked = excluded.company_locked`,
-  ).run(
-    c.id,
-    c.company,
-    c.chequeNo,
-    c.payee,
-    c.amount,
-    c.issueDate,
-    c.encodedDate,
-    c.bankAccount,
-    c.particulars,
-    c.status,
-    c.createdAt,
-    c.imported ? 1 : 0,
-    c.companyBasis,
-    c.sourceRow,
-    c.companyLocked ? 1 : 0,
+    [
+      c.id, c.company, c.chequeNo, c.payee, c.amount, c.issueDate, c.encodedDate, c.bankAccount,
+      c.particulars, c.status, c.createdAt, c.imported, c.companyBasis, c.sourceRow, c.companyLocked,
+    ],
   );
 }
 
-export function removeCheque(db: DatabaseSync, id: string): void {
-  db.prepare("DELETE FROM cheques WHERE id = ?").run(id);
+export async function removeCheque(sql: Sql, id: string): Promise<void> {
+  await sql.query("DELETE FROM cheques WHERE id = $1", [id]);
 }
 
 /** A company chosen by hand. It is locked, so a sheet sync never changes it. */
-export function setCompany(db: DatabaseSync, id: string, company: Company): Cheque {
-  const c = getCheque(db, id);
-  db.prepare("UPDATE cheques SET company = ?, company_basis = 'manual', company_locked = 1 WHERE id = ?").run(company, id);
-  return { ...c, company, companyBasis: "manual", companyLocked: true };
+export async function setCompany(sql: Sql, id: string, company: Company): Promise<Cheque> {
+  const rows = await sql.query<Row>(
+    "UPDATE cheques SET company = $1, company_basis = 'manual', company_locked = true WHERE id = $2 RETURNING *",
+    [company, id],
+  );
+  if (!rows[0]) throw new ChequeError("not_found", "This cheque no longer exists. Refresh the page.");
+  return toCheque(rows[0]);
 }
 
-export function getCompanyNames(db: DatabaseSync): CompanyNames {
-  const row = db.prepare("SELECT value FROM config WHERE key = 'companies'").get() as { value: string } | undefined;
-  return { ...DEFAULT_COMPANY_NAMES, ...(row ? (JSON.parse(row.value) as Partial<CompanyNames>) : {}) };
+async function getConfig(sql: Sql, key: string): Promise<string | null> {
+  return (await sql.query<{ value: string }>("SELECT value FROM config WHERE key = $1", [key]))[0]?.value ?? null;
 }
 
-export function setCompanyNames(db: DatabaseSync, names: CompanyNames): CompanyNames {
+export async function setConfig(sql: Sql, key: string, value: string): Promise<void> {
+  await sql.query(
+    "INSERT INTO config (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+    [key, value],
+  );
+}
+
+export async function getConfigJson<T>(sql: Sql, key: string): Promise<T | null> {
+  const value = await getConfig(sql, key);
+  return value === null ? null : (JSON.parse(value) as T);
+}
+
+export async function deleteConfig(sql: Sql, key: string): Promise<void> {
+  await sql.query("DELETE FROM config WHERE key = $1", [key]);
+}
+
+export async function getCompanyNames(sql: Sql): Promise<CompanyNames> {
+  return { ...DEFAULT_COMPANY_NAMES, ...((await getConfigJson<Partial<CompanyNames>>(sql, "companies")) ?? {}) };
+}
+
+export async function setCompanyNames(sql: Sql, names: CompanyNames): Promise<CompanyNames> {
   const clean: CompanyNames = { wwj: names.wwj, wythlae: names.wythlae, wwjcorp: names.wwjcorp };
-  db.prepare(
-    "INSERT INTO config (key, value) VALUES ('companies', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-  ).run(JSON.stringify(clean));
+  await setConfig(sql, "companies", JSON.stringify(clean));
   return clean;
 }
 
-export function listHolidays(db: DatabaseSync): Holiday[] {
-  return db.prepare("SELECT date, name FROM holidays ORDER BY date").all() as Holiday[];
+export async function listHolidays(sql: Sql): Promise<Holiday[]> {
+  return sql.query<Holiday>("SELECT date, name FROM holidays ORDER BY date");
 }
 
 /** Adds the holiday, or renames it when the date is already there. */
-export function addHoliday(db: DatabaseSync, h: Holiday): Holiday {
-  db.prepare("INSERT INTO holidays (date, name) VALUES (?, ?) ON CONFLICT(date) DO UPDATE SET name = excluded.name").run(
+export async function addHoliday(sql: Sql, h: Holiday): Promise<Holiday> {
+  await sql.query("INSERT INTO holidays (date, name) VALUES ($1, $2) ON CONFLICT (date) DO UPDATE SET name = excluded.name", [
     h.date,
     h.name,
-  );
+  ]);
   return h;
 }
 
-export function removeHoliday(db: DatabaseSync, date: string): void {
-  db.prepare("DELETE FROM holidays WHERE date = ?").run(date);
+export async function removeHoliday(sql: Sql, date: string): Promise<void> {
+  await sql.query("DELETE FROM holidays WHERE date = $1", [date]);
 }

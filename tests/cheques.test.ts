@@ -1,8 +1,6 @@
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
-import { DatabaseSync } from "node:sqlite";
+import type { Sql } from "@/lib/sql";
+import { resetDb, testSql } from "./db";
 import {
   ChequeError,
   getCompanyNames,
@@ -12,38 +10,38 @@ import {
   setCompanyNames,
   upsertCheque,
 } from "@/lib/cheques";
-import { openDatabase } from "@/lib/db";
 import { cheque } from "./helpers";
 
-let db: DatabaseSync;
-beforeEach(() => {
-  db = openDatabase(":memory:");
+let sql: Sql;
+beforeEach(async () => {
+  sql = await testSql();
+  await resetDb(sql);
 });
 
 describe("cheques store", () => {
-  it("saves and lists a cheque with every field", () => {
+  it("saves and lists a cheque with every field", async () => {
     const c = cheque({ chequeNo: "0012", encodedDate: "2026-09-28", companyBasis: "none", sourceRow: 7, imported: true });
-    upsertCheque(db, c);
-    expect(listCheques(db)).toEqual([c]);
+    await upsertCheque(sql, c);
+    expect((await listCheques(sql))).toEqual([c]);
   });
 
-  it("replaces the cheque with the same id", () => {
+  it("replaces the cheque with the same id", async () => {
     const c = cheque({ amount: 10 });
-    upsertCheque(db, c);
-    upsertCheque(db, { ...c, amount: 20, status: "cleared" });
-    expect(listCheques(db)).toEqual([{ ...c, amount: 20, status: "cleared" }]);
+    await upsertCheque(sql, c);
+    await upsertCheque(sql, { ...c, amount: 20, status: "cleared" });
+    expect((await listCheques(sql))).toEqual([{ ...c, amount: 20, status: "cleared" }]);
   });
 
-  it("locks the company when it is chosen by hand", () => {
+  it("locks the company when it is chosen by hand", async () => {
     const c = cheque({ company: "unassigned", companyBasis: "none" });
-    upsertCheque(db, c);
-    expect(setCompany(db, c.id, "wwjcorp")).toMatchObject({ company: "wwjcorp", companyLocked: true, companyBasis: "manual" });
-    expect(listCheques(db)[0]).toMatchObject({ company: "wwjcorp", companyLocked: true, companyBasis: "manual" });
+    await upsertCheque(sql, c);
+    expect(await setCompany(sql, c.id, "wwjcorp")).toMatchObject({ company: "wwjcorp", companyLocked: true, companyBasis: "manual" });
+    expect((await listCheques(sql))[0]).toMatchObject({ company: "wwjcorp", companyLocked: true, companyBasis: "manual" });
   });
 
-  it("reports an unknown id", () => {
+  it("reports an unknown id", async () => {
     try {
-      setCompany(db, "nope", "wwj");
+      await setCompany(sql, "nope", "wwj");
       expect.unreachable();
     } catch (e) {
       expect(e).toBeInstanceOf(ChequeError);
@@ -51,41 +49,28 @@ describe("cheques store", () => {
     }
   });
 
-  it("removes a cheque", () => {
+  it("removes a cheque", async () => {
     const c = cheque();
-    upsertCheque(db, c);
-    removeCheque(db, c.id);
-    expect(listCheques(db)).toEqual([]);
+    await upsertCheque(sql, c);
+    await removeCheque(sql, c.id);
+    expect((await listCheques(sql))).toEqual([]);
   });
 
-  it("starts with the default company names and saves new ones", () => {
-    expect(getCompanyNames(db)).toEqual({ wwj: "WWJ Trading", wythlae: "Wythlae 1220", wwjcorp: "WWJ Corp" });
-    setCompanyNames(db, { wwj: "WWJ", wythlae: "Wythlae", wwjcorp: "Corp" });
-    expect(getCompanyNames(db)).toEqual({ wwj: "WWJ", wythlae: "Wythlae", wwjcorp: "Corp" });
+  it("starts with the default company names and saves new ones", async () => {
+    expect((await getCompanyNames(sql))).toEqual({ wwj: "WWJ Trading", wythlae: "Wythlae 1220", wwjcorp: "WWJ Corp" });
+    await setCompanyNames(sql, { wwj: "WWJ", wythlae: "Wythlae", wwjcorp: "Corp" });
+    expect((await getCompanyNames(sql))).toEqual({ wwj: "WWJ", wythlae: "Wythlae", wwjcorp: "Corp" });
   });
 
-  it("adds the lock column to a database made before it existed, keeping its cheques", () => {
-    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "cheques-")), "old.db");
-    const old = new DatabaseSync(file);
-    old.exec(`CREATE TABLE cheques (
-      id TEXT PRIMARY KEY, company TEXT NOT NULL, cheque_no TEXT NOT NULL, payee TEXT NOT NULL, amount REAL,
-      issue_date TEXT NOT NULL, encoded_date TEXT, bank_account TEXT NOT NULL DEFAULT '',
-      particulars TEXT NOT NULL DEFAULT '', status TEXT NOT NULL, created_at INTEGER NOT NULL,
-      imported INTEGER NOT NULL DEFAULT 0, company_basis TEXT, source_row INTEGER)`);
-    old.exec(`INSERT INTO cheques (id, company, cheque_no, payee, amount, issue_date, status, created_at)
-              VALUES ('imp-2', 'wwj', '1', 'Sample Supplier', 5, '2026-10-05', 'issued', 0)`);
-    // Chosen by hand before the lock existed: the import left it Unassigned (basis "none").
-    old.exec(`INSERT INTO cheques (id, company, cheque_no, payee, amount, issue_date, status, created_at, company_basis)
-              VALUES ('imp-3', 'wythlae', '2', 'Sample Supplier', 5, '2026-10-05', 'issued', 0, 'none'),
-                     ('imp-4', 'unassigned', '3', 'Sample Supplier', 5, '2026-10-05', 'issued', 0, 'none'),
-                     ('imp-5', 'wwj', '4', 'Sample Supplier', 5, '2026-10-05', 'issued', 0, 'checkno-label')`);
-    old.close();
-    const reopened = openDatabase(file);
-    const byId = Object.fromEntries(listCheques(reopened).map((c) => [c.id, c]));
-    expect(byId["imp-2"].companyLocked).toBe(false);
-    expect(byId["imp-3"]).toMatchObject({ company: "wythlae", companyLocked: true, companyBasis: "manual" });
-    expect(byId["imp-4"].companyLocked).toBe(false);
-    expect(byId["imp-5"]).toMatchObject({ companyLocked: false, companyBasis: "checkno-label" });
-    reopened.close();
+  it("returns amounts and timestamps as numbers, not text", async () => {
+    await upsertCheque(sql, cheque({ id: "n-1", amount: 100.5, createdAt: 1759449600000 }));
+    await upsertCheque(sql, cheque({ id: "n-2", amount: null }));
+    const all = await listCheques(sql);
+    const one = all.find((c) => c.id === "n-1")!;
+    expect(one.amount).toBe(100.5);
+    expect(typeof one.createdAt).toBe("number");
+    expect(one.createdAt).toBe(1759449600000);
+    expect(all.find((c) => c.id === "n-2")!.amount).toBeNull();
+    expect(typeof one.imported).toBe("boolean");
   });
 });

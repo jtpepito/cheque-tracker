@@ -1,11 +1,8 @@
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
-import type { DatabaseSync } from "node:sqlite";
+import type { Sql } from "@/lib/sql";
+import { resetDb, testSql } from "./db";
 import { getCompanyNames, listCheques, setCompany, upsertCheque } from "@/lib/cheques";
-import { openDatabase } from "@/lib/db";
-import { importCheques, importIfPresent, type ImportFile } from "@/lib/import";
+import { importCheques, type ImportFile } from "@/lib/import";
 import { cheque } from "./helpers";
 
 const row = (over: Record<string, unknown> = {}) => ({
@@ -26,67 +23,68 @@ const row = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-let db: DatabaseSync;
-beforeEach(() => {
-  db = openDatabase(":memory:");
+let sql: Sql;
+beforeEach(async () => {
+  sql = await testSql();
+  await resetDb(sql);
 });
 
 describe("importCheques", () => {
-  it("loads rows with every field", () => {
-    const r = importCheques(db, { cheques: [row()] });
+  it("loads rows with every field", async () => {
+    const r = await importCheques(sql, { cheques: [row()] });
     expect(r.count).toBe(1);
-    expect(listCheques(db)[0]).toEqual({ ...row(), companyLocked: false });
+    expect((await listCheques(sql))[0]).toEqual({ ...row(), companyLocked: false });
   });
 
-  it("can be run twice without duplicating rows, and the file wins", () => {
+  it("can be run twice without duplicating rows, and the file wins", async () => {
     const file: ImportFile = { cheques: [row(), row({ id: "imp-3", sourceRow: 3, chequeNo: "WWJ000002" })] };
-    importCheques(db, file);
-    upsertCheque(db, { ...listCheques(db).find((c) => c.id === "imp-2")!, payee: "Edited" });
-    importCheques(db, file);
-    const all = listCheques(db);
+    await importCheques(sql, file);
+    await upsertCheque(sql, { ...(await listCheques(sql)).find((c) => c.id === "imp-2")!, payee: "Edited" });
+    await importCheques(sql, file);
+    const all = (await listCheques(sql));
     expect(all).toHaveLength(2);
     expect(all.find((c) => c.id === "imp-2")!.payee).toBe("Sample Supplier");
   });
 
-  it("leaves cheques that are not in the file alone", () => {
-    upsertCheque(db, cheque({ id: "other-1" }));
-    importCheques(db, { cheques: [row()] });
-    expect(listCheques(db)).toHaveLength(2);
+  it("leaves cheques that are not in the file alone", async () => {
+    await upsertCheque(sql, cheque({ id: "other-1" }));
+    await importCheques(sql, { cheques: [row()] });
+    expect((await listCheques(sql))).toHaveLength(2);
   });
 
-  it("keeps a blank amount as null and a numeric cheque no. as text", () => {
-    importCheques(db, { cheques: [row({ amount: null, chequeNo: 657516 }), row({ id: "imp-4", amount: "" })] });
-    const all = listCheques(db);
+  it("keeps a blank amount as null and a numeric cheque no. as text", async () => {
+    await importCheques(sql, { cheques: [row({ amount: null, chequeNo: 657516 }), row({ id: "imp-4", amount: "" })] });
+    const all = (await listCheques(sql));
     expect(all.find((c) => c.id === "imp-2")).toMatchObject({ amount: null, chequeNo: "657516" });
     expect(all.find((c) => c.id === "imp-4")!.amount).toBeNull();
   });
 
-  it("keeps a row whose cheque date is blank in the source, with an empty date", () => {
-    importCheques(db, { cheques: [row({ issueDate: null }), row({ id: "imp-5", issueDate: "" })] });
-    expect(listCheques(db).map((c) => c.issueDate)).toEqual(["", ""]);
+  it("keeps a row whose cheque date is blank in the source, with an empty date", async () => {
+    await importCheques(sql, { cheques: [row({ issueDate: null }), row({ id: "imp-5", issueDate: "" })] });
+    expect((await listCheques(sql)).map((c) => c.issueDate)).toEqual(["", ""]);
   });
 
-  it("fills optional fields that are missing", () => {
-    importCheques(db, { cheques: [{ id: "x1", company: "wwj", chequeNo: "1", payee: "P", amount: 5, issueDate: "2026-10-05", status: "issued" }] });
-    expect(listCheques(db)[0]).toMatchObject({ bankAccount: "", particulars: "", encodedDate: null, imported: false, sourceRow: null });
+  it("fills optional fields that are missing", async () => {
+    await importCheques(sql, { cheques: [{ id: "x1", company: "wwj", chequeNo: "1", payee: "P", amount: 5, issueDate: "2026-10-05", status: "issued" }] });
+    expect((await listCheques(sql))[0]).toMatchObject({ bankAccount: "", particulars: "", encodedDate: null, imported: false, sourceRow: null });
   });
 
-  it("stops and saves nothing when a row is unusable", () => {
+  it("stops and saves nothing when a row is unusable", async () => {
     const bad = [row(), row({ id: "imp-9", issueDate: "05/10/2026" })];
-    expect(() => importCheques(db, { cheques: bad })).toThrow(/imp-9.*cheque date/);
-    expect(listCheques(db)).toHaveLength(0);
-    expect(() => importCheques(db, { cheques: [row({ company: "acme" })] })).toThrow(/company/);
-    expect(() => importCheques(db, { cheques: [row({ status: "lost" })] })).toThrow(/status/);
-    expect(() => importCheques(db, { cheques: [row({ id: "" })] })).toThrow(/id/);
+    await expect(importCheques(sql, { cheques: bad })).rejects.toThrow(/imp-9.*cheque date/);
+    expect((await listCheques(sql))).toHaveLength(0);
+    await expect(importCheques(sql, { cheques: [row({ company: "acme" })] })).rejects.toThrow(/company/);
+    await expect(importCheques(sql, { cheques: [row({ status: "lost" })] })).rejects.toThrow(/status/);
+    await expect(importCheques(sql, { cheques: [row({ id: "" })] })).rejects.toThrow(/id/);
   });
 
-  it("applies company names from the file", () => {
-    importCheques(db, { companies: { wwj: "WWJ Renamed" }, cheques: [] });
-    expect(getCompanyNames(db)).toEqual({ wwj: "WWJ Renamed", wythlae: "Wythlae 1220", wwjcorp: "WWJ Corp" });
+  it("applies company names from the file", async () => {
+    await importCheques(sql, { companies: { wwj: "WWJ Renamed" }, cheques: [] });
+    expect((await getCompanyNames(sql))).toEqual({ wwj: "WWJ Renamed", wythlae: "Wythlae 1220", wwjcorp: "WWJ Corp" });
   });
 
-  it("summarises the whole register by company", () => {
-    const r = importCheques(db, {
+  it("summarises the whole register by company", async () => {
+    const r = await importCheques(sql, {
       cheques: [row(), row({ id: "imp-3", company: "unassigned", amount: 200 }), row({ id: "imp-4", amount: null })],
     });
     expect(r.summary).toBe(
@@ -95,76 +93,44 @@ describe("importCheques", () => {
   });
 });
 
-describe("importIfPresent", () => {
-  it("does nothing when there is no file", () => {
-    expect(importIfPresent(db, path.join(os.tmpdir(), "no-such-cheques-import.json"))).toBeNull();
-  });
-
-  it("imports the file once and renames it so it is not loaded again", () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cheques-"));
-    const file = path.join(dir, "cheques-import.json");
-    fs.writeFileSync(file, JSON.stringify({ cheques: [row()] }));
-    expect(importIfPresent(db, file)!.count).toBe(1);
-    expect(fs.existsSync(file)).toBe(false);
-    expect(fs.readdirSync(dir).some((n) => /^cheques-import\.imported-\d{4}-\d{2}-\d{2}\.json$/.test(n))).toBe(true);
-    expect(importIfPresent(db, file)).toBeNull();
-  });
-});
 
 describe("import strictness", () => {
-  it("reads an amount typed as text", () => {
-    importCheques(db, { cheques: [row({ amount: "1,250.00" })] });
-    expect(listCheques(db)[0].amount).toBe(1250);
+  it("reads an amount typed as text", async () => {
+    await importCheques(sql, { cheques: [row({ amount: "1,250.00" })] });
+    expect((await listCheques(sql))[0].amount).toBe(1250);
   });
 
-  it("stops on an amount it cannot read, naming the row", () => {
-    expect(() => importCheques(db, { cheques: [row({ amount: "abc" })] })).toThrow(/imp-2.*amount/);
-    expect(() => importCheques(db, { cheques: [row({ amount: -5 })] })).toThrow(/imp-2.*amount/);
-    expect(listCheques(db)).toHaveLength(0);
+  it("stops on an amount it cannot read, naming the row", async () => {
+    await expect(importCheques(sql, { cheques: [row({ amount: "abc" })] })).rejects.toThrow(/imp-2.*amount/);
+    await expect(importCheques(sql, { cheques: [row({ amount: -5 })] })).rejects.toThrow(/imp-2.*amount/);
+    expect((await listCheques(sql))).toHaveLength(0);
   });
 
-  it("stops on a row that is not an object, naming the row", () => {
-    expect(() => importCheques(db, { cheques: [row(), null as unknown as Record<string, unknown>] })).toThrow(/Row 2/);
+  it("stops on a row that is not an object, naming the row", async () => {
+    await expect(importCheques(sql, { cheques: [row(), null as unknown as Record<string, unknown>] })).rejects.toThrow(/Row 2/);
   });
 
-  it("stops on a company name that is not text", () => {
+  it("stops on a company name that is not text", async () => {
     const companies = { wwj: 5 } as unknown as { wwj: string };
-    expect(() => importCheques(db, { companies, cheques: [] })).toThrow(/company name/);
-    expect(getCompanyNames(db).wwj).toBe("WWJ Trading");
+    await expect(importCheques(sql, { companies, cheques: [] })).rejects.toThrow(/company name/);
+    expect((await getCompanyNames(sql)).wwj).toBe("WWJ Trading");
   });
 
-  it("drops the .0 a spreadsheet adds to a numeric cheque no.", () => {
-    importCheques(db, { cheques: [row({ chequeNo: "663957.0" }), row({ id: "imp-3", chequeNo: "WWJ1.0" })] });
-    expect(listCheques(db).map((c) => c.chequeNo).sort()).toEqual(["663957", "WWJ1.0"]);
+  it("drops the .0 a spreadsheet adds to a numeric cheque no.", async () => {
+    await importCheques(sql, { cheques: [row({ chequeNo: "663957.0" }), row({ id: "imp-3", chequeNo: "WWJ1.0" })] });
+    expect((await listCheques(sql)).map((c) => c.chequeNo).sort()).toEqual(["663957", "WWJ1.0"]);
   });
 
-  it("loads nothing when the file cannot be renamed, so it is never loaded twice", () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cheques-"));
-    const file = path.join(dir, "cheques-import.json");
-    fs.writeFileSync(file, JSON.stringify({ cheques: [row()] }));
-    // A folder squatting on the renamed file's name makes the rename fail.
-    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
-    fs.mkdirSync(path.join(dir, `cheques-import.imported-${today}.json`));
-    expect(() => importIfPresent(db, file)).toThrow();
-    expect(listCheques(db)).toHaveLength(0);
-  });
 
-  it("puts the file back when its contents are bad, so it can be fixed and retried", () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cheques-"));
-    const file = path.join(dir, "cheques-import.json");
-    fs.writeFileSync(file, JSON.stringify({ cheques: [row({ company: "acme" })] }));
-    expect(() => importIfPresent(db, file)).toThrow(/company/);
-    expect(fs.existsSync(file)).toBe(true);
-  });
 });
 
 describe("import and hand-chosen companies", () => {
-  it("keeps a company chosen by hand when the file is loaded again", () => {
+  it("keeps a company chosen by hand when the file is loaded again", async () => {
     const file: ImportFile = { cheques: [row(), row({ id: "imp-3", sourceRow: 3, chequeNo: "WWJ000002" })] };
-    importCheques(db, file);
-    setCompany(db, "imp-2", "wythlae");
-    importCheques(db, { cheques: [row({ amount: 999 }), row({ id: "imp-3", sourceRow: 3, chequeNo: "WWJ000002" })] });
-    const all = listCheques(db);
+    await importCheques(sql, file);
+    await setCompany(sql, "imp-2", "wythlae");
+    await importCheques(sql, { cheques: [row({ amount: 999 }), row({ id: "imp-3", sourceRow: 3, chequeNo: "WWJ000002" })] });
+    const all = (await listCheques(sql));
     expect(all.find((c) => c.id === "imp-2")).toMatchObject({ company: "wythlae", companyLocked: true, companyBasis: "manual", amount: 999 });
     expect(all.find((c) => c.id === "imp-3")).toMatchObject({ company: "wwj", companyLocked: false });
   });
