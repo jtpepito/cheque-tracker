@@ -19,6 +19,7 @@ export function cheque(over: Partial<Cheque> = {}): Cheque {
     imported: false,
     companyBasis: null,
     sourceRow: null,
+    companyLocked: false,
     ...over,
   };
 }

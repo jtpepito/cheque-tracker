@@ -3,9 +3,10 @@ import os from "node:os";
 import path from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { DatabaseSync } from "node:sqlite";
-import { createCheque, getCompanyNames, listCheques, setCompany } from "@/lib/cheques";
+import { getCompanyNames, listCheques, setCompany, upsertCheque } from "@/lib/cheques";
 import { openDatabase } from "@/lib/db";
 import { importCheques, importIfPresent, type ImportFile } from "@/lib/import";
+import { cheque } from "./helpers";
 
 const row = (over: Record<string, unknown> = {}) => ({
   id: "imp-2",
@@ -34,7 +35,7 @@ describe("importCheques", () => {
   it("loads rows with every field", () => {
     const r = importCheques(db, { cheques: [row()] });
     expect(r.count).toBe(1);
-    expect(listCheques(db)[0]).toEqual(row());
+    expect(listCheques(db)[0]).toEqual({ ...row(), companyLocked: false });
   });
 
   it("can be run twice without duplicating rows, and the file wins", () => {
@@ -48,10 +49,7 @@ describe("importCheques", () => {
   });
 
   it("leaves cheques that are not in the file alone", () => {
-    createCheque(db, {
-      company: "wwj", chequeNo: "9", payee: "Other", amount: 1, issueDate: "2026-10-06",
-      bankAccount: "", particulars: "", status: "issued",
-    });
+    upsertCheque(db, cheque({ id: "other-1" }));
     importCheques(db, { cheques: [row()] });
     expect(listCheques(db)).toHaveLength(2);
   });

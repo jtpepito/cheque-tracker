@@ -14,7 +14,7 @@ export async function guarded(handler: Handler): Promise<NextResponse> {
     return await handler();
   } catch (err) {
     if (err instanceof ChequeError) {
-      return NextResponse.json({ error: err.message }, { status: err.code === "not_found" ? 404 : 409 });
+      return NextResponse.json({ error: err.message }, { status: 404 });
     }
     console.error("[api] failed:", err);
     return NextResponse.json({ error: "Something went wrong. Try again." }, { status: 500 });

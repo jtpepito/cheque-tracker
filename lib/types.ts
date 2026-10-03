@@ -22,6 +22,8 @@ export type Cheque = {
   imported: boolean;
   companyBasis: string | null;
   sourceRow: number | null;
+  /** True once someone chose the company by hand; a sheet sync then never changes it. */
+  companyLocked: boolean;
 };
 
 export type CompanyNames = Record<Exclude<Company, "unassigned">, string>;

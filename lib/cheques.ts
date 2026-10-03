@@ -1,14 +1,11 @@
 import "server-only";
-import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import type { Holiday } from "./banking";
-import { canTransition } from "./rules";
 import { DEFAULT_COMPANY_NAMES, type Cheque, type Company, type CompanyNames, type Status } from "./types";
-import type { NewChequeInput } from "./validate";
 
 export class ChequeError extends Error {
   constructor(
-    public code: "not_found" | "conflict" | "duplicate",
+    public code: "not_found",
     message: string,
   ) {
     super(message);
@@ -33,6 +30,7 @@ function toCheque(r: Row): Cheque {
     imported: Number(r.imported) === 1,
     companyBasis: (r.company_basis as string | null) ?? null,
     sourceRow: r.source_row == null ? null : Number(r.source_row),
+    companyLocked: Number(r.company_locked) === 1,
   };
 }
 
@@ -50,14 +48,15 @@ function getCheque(db: DatabaseSync, id: string): Cheque {
 export function upsertCheque(db: DatabaseSync, c: Cheque): void {
   db.prepare(
     `INSERT INTO cheques (id, company, cheque_no, payee, amount, issue_date, encoded_date, bank_account,
-                          particulars, status, created_at, imported, company_basis, source_row)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                          particulars, status, created_at, imported, company_basis, source_row, company_locked)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        company = excluded.company, cheque_no = excluded.cheque_no, payee = excluded.payee,
        amount = excluded.amount, issue_date = excluded.issue_date, encoded_date = excluded.encoded_date,
        bank_account = excluded.bank_account, particulars = excluded.particulars, status = excluded.status,
        created_at = excluded.created_at, imported = excluded.imported,
-       company_basis = excluded.company_basis, source_row = excluded.source_row`,
+       company_basis = excluded.company_basis, source_row = excluded.source_row,
+       company_locked = excluded.company_locked`,
   ).run(
     c.id,
     c.company,
@@ -73,45 +72,19 @@ export function upsertCheque(db: DatabaseSync, c: Cheque): void {
     c.imported ? 1 : 0,
     c.companyBasis,
     c.sourceRow,
+    c.companyLocked ? 1 : 0,
   );
 }
 
-export function createCheque(db: DatabaseSync, input: NewChequeInput, now: number = Date.now()): Cheque {
-  const clash = db
-    .prepare("SELECT 1 FROM cheques WHERE company = ? AND cheque_no = ? COLLATE NOCASE AND status <> 'voided'")
-    .get(input.company, input.chequeNo);
-  if (clash) {
-    throw new ChequeError("duplicate", `Cheque no. ${input.chequeNo} is already in the register for this company.`);
-  }
-  const c: Cheque = {
-    id: randomUUID(),
-    ...input,
-    encodedDate: null,
-    createdAt: now,
-    imported: false,
-    companyBasis: null,
-    sourceRow: null,
-  };
-  upsertCheque(db, c);
-  return c;
+export function removeCheque(db: DatabaseSync, id: string): void {
+  db.prepare("DELETE FROM cheques WHERE id = ?").run(id);
 }
 
-export function setStatus(db: DatabaseSync, id: string, to: Status): Cheque {
-  const c = getCheque(db, id);
-  if (!canTransition(c.status, to)) {
-    throw new ChequeError(
-      "conflict",
-      c.status === to ? `This cheque is already ${to}.` : `A ${c.status} cheque can't be marked ${to}.`,
-    );
-  }
-  db.prepare("UPDATE cheques SET status = ? WHERE id = ?").run(to, id);
-  return { ...c, status: to };
-}
-
+/** A company chosen by hand. It is locked, so a sheet sync never changes it. */
 export function setCompany(db: DatabaseSync, id: string, company: Company): Cheque {
   const c = getCheque(db, id);
-  db.prepare("UPDATE cheques SET company = ? WHERE id = ?").run(company, id);
-  return { ...c, company };
+  db.prepare("UPDATE cheques SET company = ?, company_basis = 'manual', company_locked = 1 WHERE id = ?").run(company, id);
+  return { ...c, company, companyBasis: "manual", companyLocked: true };
 }
 
 export function getCompanyNames(db: DatabaseSync): CompanyNames {

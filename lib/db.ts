@@ -26,7 +26,8 @@ CREATE TABLE IF NOT EXISTS cheques (
   created_at    INTEGER NOT NULL,
   imported      INTEGER NOT NULL DEFAULT 0,
   company_basis TEXT,
-  source_row    INTEGER
+  source_row    INTEGER,
+  company_locked INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS cheques_issue_date ON cheques(issue_date);
 
@@ -52,6 +53,11 @@ export function openDatabase(file: string): DatabaseSync {
   const db = new DatabaseSync(file);
   if (onDisk) db.exec("PRAGMA journal_mode = WAL");
   db.exec(SCHEMA);
+  // Databases made before the lock column existed.
+  const columns = db.prepare("PRAGMA table_info(cheques)").all() as Array<{ name: string }>;
+  if (!columns.some((c) => c.name === "company_locked")) {
+    db.exec("ALTER TABLE cheques ADD COLUMN company_locked INTEGER NOT NULL DEFAULT 0");
+  }
   db.prepare("INSERT OR IGNORE INTO config (key, value) VALUES ('companies', ?)").run(
     JSON.stringify(DEFAULT_COMPANY_NAMES),
   );

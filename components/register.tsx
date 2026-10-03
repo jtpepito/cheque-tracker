@@ -6,15 +6,7 @@ import { clearingDate, type Holiday } from "@/lib/banking";
 import { shortDate } from "@/lib/dates";
 import { peso } from "@/lib/money";
 import { DEFAULT_FILTERS, filterAndSort, issuedSummary, unassignedSummary, type Filters } from "@/lib/register";
-import { nextStatuses } from "@/lib/rules";
-import { COMPANIES, STATUSES, companyLabel, type Cheque, type Company, type CompanyNames, type Status } from "@/lib/types";
-
-const ACTION_LABEL: Record<Status, string> = {
-  pending: "Mark pending",
-  issued: "Mark issued",
-  cleared: "Mark cleared",
-  voided: "Void",
-};
+import { COMPANIES, STATUSES, companyLabel, type Cheque, type Company, type CompanyNames } from "@/lib/types";
 
 const GRID = "md:grid md:grid-cols-[7rem_10rem_8rem_minmax(0,1fr)_8rem_5rem_11rem] md:items-center md:gap-3";
 
@@ -38,7 +30,7 @@ export function Register({
   const issued = issuedSummary(cheques);
   const unassigned = unassignedSummary(cheques);
 
-  async function change(id: string, body: { status: Status } | { company: Company }) {
+  async function change(id: string, body: { company: Company }) {
     setBusy(id);
     setRowError(null);
     try {
@@ -175,19 +167,6 @@ export function Register({
               </div>
               <p className="font-mono md:text-right">{c.amount === null ? "—" : peso(c.amount)}</p>
               <p className="capitalize">{c.status}</p>
-              <div className="flex flex-wrap gap-1.5">
-                {nextStatuses(c.status).map((to) => (
-                  <button
-                    key={to}
-                    type="button"
-                    className={`btn ${to === "voided" ? "" : "btn-primary"}`}
-                    disabled={busy === c.id}
-                    onClick={() => change(c.id, { status: to })}
-                  >
-                    {ACTION_LABEL[to]}
-                  </button>
-                ))}
-              </div>
             </li>
           ))}
         </ul>

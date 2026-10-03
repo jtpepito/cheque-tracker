@@ -6,7 +6,6 @@ import type { Holiday } from "@/lib/banking";
 import { buildCalendar } from "@/lib/calendar";
 import { latestOnly } from "@/lib/latest";
 import type { Cheque, CompanyNames } from "@/lib/types";
-import { ChequeForm } from "./cheque-form";
 import { FundingCalendar } from "./funding-calendar";
 import { Header } from "./header";
 import { Holidays } from "./holidays";
@@ -58,7 +57,6 @@ export function Tracker() {
         </p>
       )}
       <FundingCalendar days={buildCalendar(state.cheques, state.today, state.holidays)} names={state.companies} />
-      <ChequeForm key={state.today} today={state.today} names={state.companies} onSaved={refresh} />
       <Register cheques={state.cheques} names={state.companies} holidays={state.holidays} onChanged={refresh} />
       <Holidays holidays={state.holidays} today={state.today} onChanged={refresh} />
     </main>
