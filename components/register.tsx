@@ -8,7 +8,7 @@ import { peso } from "@/lib/money";
 import { DEFAULT_FILTERS, filterAndSort, issuedSummary, unassignedSummary, type Filters } from "@/lib/register";
 import { COMPANIES, STATUSES, companyLabel, type Cheque, type Company, type CompanyNames } from "@/lib/types";
 
-const GRID = "md:grid md:grid-cols-[7rem_10rem_8rem_minmax(0,1fr)_8rem_5rem_11rem] md:items-center md:gap-3";
+const GRID = "md:grid md:grid-cols-[7rem_11rem_8rem_minmax(0,1fr)_8rem_5rem] md:items-center md:gap-3";
 
 export function Register({
   cheques,
@@ -24,23 +24,21 @@ export function Register({
   const holidayDates = new Set(holidays.map((h) => h.date));
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [busy, setBusy] = useState<string | null>(null);
-  const [rowError, setRowError] = useState<{ id: string; message: string } | null>(null);
+  const [rowError, setRowError] = useState<string | null>(null);
 
   const rows = filterAndSort(cheques, filters);
   const issued = issuedSummary(cheques);
   const unassigned = unassignedSummary(cheques);
 
-  async function change(id: string, body: { company: Company }) {
-    setBusy(id);
+  async function setCompany(c: Cheque, company: Company) {
+    setBusy(c.id);
     setRowError(null);
     try {
-      await api<Cheque>(`/api/cheques/${encodeURIComponent(id)}`, "PATCH", body);
+      await api<Cheque>(`/api/cheques/${encodeURIComponent(c.id)}`, "PATCH", { company });
     } catch (err) {
-      const c = cheques.find((x) => x.id === id);
       const message = err instanceof ApiError ? err.message : "Something went wrong. Try again.";
-      setRowError({ id, message: c ? `Cheque ${c.chequeNo || "(no number)"}, ${c.payee}: ${message}` : message });
+      setRowError(`Cheque ${c.chequeNo || "(no number)"}, ${c.payee}: ${message}`);
     }
-    // Refresh either way: after a refusal the row shows what someone else already did.
     await onChanged();
     setBusy(null);
   }
@@ -53,6 +51,9 @@ export function Register({
       <p className="text-sm">
         Issued, not yet cleared: <strong>{peso(issued.total)}</strong> across {issued.count}{" "}
         {issued.count === 1 ? "cheque" : "cheques"}.
+      </p>
+      <p className="text-sm text-muted">
+        Cheques and their status come from the Google Sheet. To add a cheque or mark one cleared, update the sheet.
       </p>
       {unassigned.count > 0 && (
         <p className="rounded-lg bg-warn p-3 text-sm text-warn-ink">
@@ -105,10 +106,10 @@ export function Register({
         </span>
       </div>
 
-      {/* Shown above the list, not in the row: a refused row may now be hidden by the filters. */}
+      {/* Shown above the list, not in the row: the row may be hidden by the filters. */}
       {rowError && (
         <p role="alert" className="rounded-lg border border-danger p-3 text-sm text-danger">
-          {rowError.message}
+          {rowError}
         </p>
       )}
 
@@ -119,7 +120,6 @@ export function Register({
         <span>Payee</span>
         <span className="text-right">Amount</span>
         <span>Status</span>
-        <span>Actions</span>
       </div>
       {rows.length === 0 ? (
         <p className="rounded-lg border border-line bg-card p-4 text-sm text-muted">No cheques match these filters.</p>
@@ -143,19 +143,22 @@ export function Register({
                   <p className="text-xs text-muted">Logged {shortDate(c.encodedDate)}</p>
                 )}
               </div>
-              <select
-                aria-label={`Company for cheque ${c.chequeNo}`}
-                className="field"
-                value={c.company}
-                disabled={busy === c.id}
-                onChange={(e) => change(c.id, { company: e.target.value as Company })}
-              >
-                {COMPANIES.map((co) => (
-                  <option key={co} value={co}>
-                    {companyLabel(names, co)}
-                  </option>
-                ))}
-              </select>
+              <div>
+                <select
+                  aria-label={`Company for cheque ${c.chequeNo}`}
+                  className="field"
+                  value={c.company}
+                  disabled={busy === c.id}
+                  onChange={(e) => setCompany(c, e.target.value as Company)}
+                >
+                  {COMPANIES.map((co) => (
+                    <option key={co} value={co}>
+                      {companyLabel(names, co)}
+                    </option>
+                  ))}
+                </select>
+                {c.companyLocked && <p className="mt-0.5 text-xs text-muted">Set here</p>}
+              </div>
               <p className="font-mono break-all">{c.chequeNo}</p>
               <div className="min-w-0">
                 <p className="break-words font-medium">{c.payee}</p>
