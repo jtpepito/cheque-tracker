@@ -158,3 +158,17 @@ Only a real (not dry) sync replaces the stored report. `/api/state` returns it a
 - Writing anything to the sheet except the Tracker ID column.
 - Syncing other tabs, or the other "next phase" items (bank balances, editing, export).
 - Unlocking a hand-chosen company.
+
+## 10. Changes made during the build (3 Oct 2026)
+
+From the code review, before the script has ever run in the real sheet:
+
+- **A check writes nothing.** "Check against the tracker (no changes)" no longer fills in Tracker IDs; rows without one are simply reported.
+- **Only one spreadsheet can sync.** The first "Sync now" asks to make that spreadsheet the one the tracker follows. A copy of it can be checked but not synced, by hand or automatically.
+- **The one-time ID step cannot run twice.** If the "Tracker ID" heading goes missing, the script says to put it back.
+- **IDs are written one cell at a time**, each after confirming the row has not moved since it was read. The ID column gets a warning-only protection.
+- **Deleting, inserting or sorting rows** also triggers a sync within a minute.
+- **A refused sync** is no longer retried every minute. The page shows the reason under the header until a sync goes through.
+- **Automatic sync belongs to one Google account.** The on and off messages name it; another account cannot turn it off.
+- **Hand-chosen companies are kept** when a database from before the lock is upgraded, and when an import file is loaded again.
+- `APP_URL` must be `https://`.
