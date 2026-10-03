@@ -1,0 +1,12 @@
+# Never ship local data, secrets or build output into the image.
+node_modules
+.next
+.next-dev
+data
+.env*
+!.env.example
+.git
+tests
+docs
+*.log
+.next-sa
