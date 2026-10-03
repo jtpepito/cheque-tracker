@@ -1,6 +1,7 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
+import type { Holiday } from "./banking";
 import { canTransition } from "./rules";
 import { DEFAULT_COMPANY_NAMES, type Cheque, type Company, type CompanyNames, type Status } from "./types";
 import type { NewChequeInput } from "./validate";
@@ -124,4 +125,21 @@ export function setCompanyNames(db: DatabaseSync, names: CompanyNames): CompanyN
     "INSERT INTO config (key, value) VALUES ('companies', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
   ).run(JSON.stringify(clean));
   return clean;
+}
+
+export function listHolidays(db: DatabaseSync): Holiday[] {
+  return db.prepare("SELECT date, name FROM holidays ORDER BY date").all() as Holiday[];
+}
+
+/** Adds the holiday, or renames it when the date is already there. */
+export function addHoliday(db: DatabaseSync, h: Holiday): Holiday {
+  db.prepare("INSERT INTO holidays (date, name) VALUES (?, ?) ON CONFLICT(date) DO UPDATE SET name = excluded.name").run(
+    h.date,
+    h.name,
+  );
+  return h;
+}
+
+export function removeHoliday(db: DatabaseSync, date: string): void {
+  db.prepare("DELETE FROM holidays WHERE date = ?").run(date);
 }

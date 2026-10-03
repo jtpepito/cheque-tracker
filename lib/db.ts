@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { scheduleDailyBackups } from "./backup";
+import { PH_HOLIDAYS_2026 } from "./banking";
 import { importIfPresent } from "./import";
 import { DEFAULT_COMPANY_NAMES } from "./types";
 
@@ -33,6 +34,12 @@ CREATE TABLE IF NOT EXISTS config (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+
+-- Days with no bank clearing, besides weekends.
+CREATE TABLE IF NOT EXISTS holidays (
+  date TEXT PRIMARY KEY,
+  name TEXT NOT NULL
+);
 `;
 
 export function dbFile(): string {
@@ -48,6 +55,12 @@ export function openDatabase(file: string): DatabaseSync {
   db.prepare("INSERT OR IGNORE INTO config (key, value) VALUES ('companies', ?)").run(
     JSON.stringify(DEFAULT_COMPANY_NAMES),
   );
+  // Seed the national holidays once, so a holiday removed in the page stays removed.
+  const seeded = db.prepare("INSERT OR IGNORE INTO config (key, value) VALUES ('holidays_seeded', '2026')").run();
+  if (seeded.changes > 0) {
+    const insert = db.prepare("INSERT OR IGNORE INTO holidays (date, name) VALUES (?, ?)");
+    for (const h of PH_HOLIDAYS_2026) insert.run(h.date, h.name);
+  }
   return db;
 }
 

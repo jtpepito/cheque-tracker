@@ -40,9 +40,45 @@ describe("buildCalendar", () => {
   });
 
   it("counts a cheque with no amount but adds zero", () => {
-    const days = buildCalendar([cheque({ amount: null }), cheque({ amount: 25 })], TODAY);
-    expect(days[0].count).toBe(2);
-    expect(days[0].total).toBe(25);
+    const monday = { issueDate: "2026-10-05" };
+    const days = buildCalendar([cheque({ ...monday, amount: null }), cheque({ ...monday, amount: 25 })], TODAY);
+    expect(days[2].count).toBe(2);
+    expect(days[2].total).toBe(25);
+  });
+
+  it("moves a weekend cheque to the next banking day", () => {
+    // 3 Oct 2026 is a Saturday, 4 Oct a Sunday.
+    const days = buildCalendar(
+      [cheque({ issueDate: "2026-10-03", amount: 10 }), cheque({ issueDate: "2026-10-04", amount: 20 })],
+      TODAY,
+    );
+    expect(days[0].total).toBe(0);
+    expect(days[1].total).toBe(0);
+    expect(days[2]).toMatchObject({ date: "2026-10-05", total: 30, count: 2 });
+  });
+
+  it("moves a holiday cheque to the next banking day, past a weekend if needed", () => {
+    const holidays = [{ date: "2026-10-09", name: "Sample Holiday" }];
+    const days = buildCalendar([cheque({ issueDate: "2026-10-09", amount: 40 })], TODAY, holidays);
+    expect(days.find((d) => d.date === "2026-10-09")!.total).toBe(0);
+    expect(days.find((d) => d.date === "2026-10-12")!.total).toBe(40);
+  });
+
+  it("counts a cheque dated before today when its clearing day is today or later", () => {
+    const days = buildCalendar([cheque({ issueDate: "2026-10-04", amount: 15 })], "2026-10-05");
+    expect(days[0]).toMatchObject({ date: "2026-10-05", total: 15 });
+  });
+
+  it("says why a day has no clearing", () => {
+    const days = buildCalendar([], TODAY, [{ date: "2026-10-09", name: "Sample Holiday" }]);
+    expect(days.slice(0, 3).map((d) => d.closed)).toEqual(["Weekend", "Weekend", null]);
+    expect(days.find((d) => d.date === "2026-10-09")!.closed).toBe("Sample Holiday");
+  });
+
+  it("stretches the soon window to the next banking day when day +2 has no clearing", () => {
+    // Friday: day +2 is Sunday, so Monday is included.
+    const days = buildCalendar([], "2026-10-02");
+    expect(days.map((d) => d.soon)).toEqual([true, true, true, true, ...Array(10).fill(false)]);
   });
 
   it("marks today through day +2 as soon", () => {
@@ -55,13 +91,14 @@ describe("dueSoon", () => {
   it("lists only soon days with money clearing", () => {
     const days = buildCalendar(
       [
-        cheque({ issueDate: "2026-10-03", amount: 10 }),
-        cheque({ issueDate: "2026-10-05", amount: 20 }),
-        cheque({ issueDate: "2026-10-06", amount: 30 }),
+        cheque({ issueDate: "2026-10-05", amount: 10 }),
+        cheque({ issueDate: "2026-10-06", amount: 20 }),
+        cheque({ issueDate: "2026-10-07", amount: 30 }),
       ],
-      TODAY,
+      "2026-10-05",
     );
-    expect(dueSoon(days).map((d) => d.date)).toEqual(["2026-10-03", "2026-10-05"]);
+    expect(dueSoon(days).map((d) => d.date)).toEqual(["2026-10-05", "2026-10-06", "2026-10-07"].slice(0, 3));
+    expect(dueSoon(buildCalendar([cheque({ issueDate: "2026-10-08", amount: 5 })], "2026-10-05"))).toEqual([]);
   });
   it("is empty when nothing is clearing in the next 2 days", () => {
     expect(dueSoon(buildCalendar([cheque({ issueDate: "2026-10-06" })], TODAY))).toEqual([]);

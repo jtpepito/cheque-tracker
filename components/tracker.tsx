@@ -2,15 +2,17 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
+import type { Holiday } from "@/lib/banking";
 import { buildCalendar } from "@/lib/calendar";
 import { latestOnly } from "@/lib/latest";
 import type { Cheque, CompanyNames } from "@/lib/types";
 import { ChequeForm } from "./cheque-form";
 import { FundingCalendar } from "./funding-calendar";
 import { Header } from "./header";
+import { Holidays } from "./holidays";
 import { Register } from "./register";
 
-type State = { today: string; companies: CompanyNames; cheques: Cheque[] };
+type State = { today: string; companies: CompanyNames; holidays: Holiday[]; cheques: Cheque[] };
 
 const REFRESH_MS = 30_000;
 
@@ -55,9 +57,10 @@ export function Tracker() {
           {problem} Showing the last data loaded; trying again shortly.
         </p>
       )}
-      <FundingCalendar days={buildCalendar(state.cheques, state.today)} names={state.companies} />
+      <FundingCalendar days={buildCalendar(state.cheques, state.today, state.holidays)} names={state.companies} />
       <ChequeForm key={state.today} today={state.today} names={state.companies} onSaved={refresh} />
-      <Register cheques={state.cheques} names={state.companies} onChanged={refresh} />
+      <Register cheques={state.cheques} names={state.companies} holidays={state.holidays} onChanged={refresh} />
+      <Holidays holidays={state.holidays} today={state.today} onChanged={refresh} />
     </main>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { api, ApiError } from "@/lib/api";
+import { clearingDate, type Holiday } from "@/lib/banking";
 import { shortDate } from "@/lib/dates";
 import { peso } from "@/lib/money";
 import { DEFAULT_FILTERS, filterAndSort, issuedSummary, unassignedSummary, type Filters } from "@/lib/register";
@@ -20,12 +21,15 @@ const GRID = "md:grid md:grid-cols-[7rem_10rem_8rem_minmax(0,1fr)_8rem_5rem_11re
 export function Register({
   cheques,
   names,
+  holidays,
   onChanged,
 }: {
   cheques: Cheque[];
   names: CompanyNames;
+  holidays: Holiday[];
   onChanged: () => Promise<void>;
 }) {
+  const holidayDates = new Set(holidays.map((h) => h.date));
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [busy, setBusy] = useState<string | null>(null);
   const [rowError, setRowError] = useState<{ id: string; message: string } | null>(null);
@@ -139,6 +143,10 @@ export function Register({
               <div>
                 <p className="font-medium">{c.issueDate ? shortDate(c.issueDate) : "No date"}</p>
                 {c.issueDate && <p className="text-xs text-muted">{c.issueDate.slice(0, 4)}</p>}
+                {(c.status === "issued" || c.status === "pending") &&
+                  clearingDate(c.issueDate, holidayDates) !== c.issueDate && (
+                    <p className="text-xs font-medium">Clears {shortDate(clearingDate(c.issueDate, holidayDates))}</p>
+                  )}
                 {c.encodedDate && c.encodedDate !== c.issueDate && (
                   <p className="text-xs text-muted">Logged {shortDate(c.encodedDate)}</p>
                 )}

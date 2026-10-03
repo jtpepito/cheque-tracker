@@ -138,3 +138,14 @@ The repo carries a `Dockerfile` and `fly.toml`. The owner runs the `flyctl` comm
 - Excel export
 - User accounts and roles
 - The local-storage fallback from the page (the app always has its database)
+
+## 11. Banking days (added 3 Oct 2026)
+
+This replaces "by cheque date" in §5.2: the calendar counts each issued cheque on its **clearing day**.
+
+- **Clearing day:** the cheque date, or the next banking day when that date is a Saturday, a Sunday or a holiday. A cheque dated before today is counted if its clearing day is today or later.
+- **Calendar:** weekend and holiday cards stay in the 14-day strip and read "No clearing" with the reason.
+- **Alert window:** today through day +2, stretched to the next banking day when day +2 has no clearing (on a Friday it reaches Monday).
+- **Register:** the cheque date column and the sort are unchanged. A pending or issued cheque whose clearing day differs shows "Clears Mon, 5 Oct" under its date.
+- **Holidays:** a `holidays` table (`date`, `name`), seeded once with the 2026 national holidays. The page's "Bank holidays" section lets anyone signed in add or remove a day; the list is shared. Local holidays, Eid holidays and later years are added there.
+- **Routes:** `POST /api/holidays`, `DELETE /api/holidays/:date`; `/api/state` also returns `holidays`.

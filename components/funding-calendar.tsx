@@ -46,9 +46,13 @@ export function FundingCalendar({ days, names }: { days: DayTotal[]; names: Comp
             }`}
           >
             <p className="text-xs font-medium">{i === 0 ? "Today" : shortDate(d.date)}</p>
-            <p className={`mt-1 font-mono text-sm font-semibold ${d.total === 0 ? "opacity-50" : ""}`}>
-              {peso(d.total)}
-            </p>
+            {d.closed ? (
+              <p className="mt-1 text-xs text-muted">No clearing · {d.closed}</p>
+            ) : (
+              <p className={`mt-1 font-mono text-sm font-semibold ${d.total === 0 ? "opacity-50" : ""}`}>
+                {peso(d.total)}
+              </p>
+            )}
             <ul className="mt-1 space-y-0.5 text-xs">
               {split(d, names).map((s) => (
                 <li key={s.label} className="flex flex-wrap justify-between gap-x-2">
