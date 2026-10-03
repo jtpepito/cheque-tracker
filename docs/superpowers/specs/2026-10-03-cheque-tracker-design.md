@@ -49,7 +49,7 @@ SQLite file at `/data/cheques.db` in production and `data/cheques.db` locally (g
 Key and value. One key, `companies`, holding JSON: `{ "wwj": "WWJ Trading", "wythlae": "Wythlae 1220", "wwjcorp": "WWJ Corp" }`. These display names are used everywhere in the page.
 
 ### Backups
-Once a day, on the first request of the day, the app copies the database to `/data/backups/` and keeps the last 30 copies.
+Once a day (checked at startup and then hourly), the app copies the database to `/data/backups/` and keeps the last 30 copies.
 
 ## 4. Structure
 
@@ -63,7 +63,7 @@ Once a day, on the first request of the day, the app copies the database to `/da
 | `app/login` | Sign-in page |
 | `app/page` | The single tracker page: header, calendar, register, new cheque form |
 | `app/api/*` | JSON routes the page calls: cheques (list, create), cheque status, cheque company, company names |
-| `scripts/import` | Loads the exported cheques file into the database |
+| `lib/import` | At startup, loads a `cheques-import.json` file found next to the database, then renames it |
 
 "Today" is always the date in Manila (Asia/Manila), on the server and in the page.
 
@@ -85,7 +85,7 @@ App title, the three company names (click to edit; saved for everyone), light/da
 - Sorted by cheque date, then cheque no.
 - Filters: company, status, and **Hide cleared & voided** (on by default).
 - Summary line: "Issued, not yet cleared: ₱X across N cheques."
-- Review banner: count and total of Unassigned cheques. Unassigned rows are tinted amber.
+- Review banner: count and total of Unassigned cheques that are still pending or issued. Unassigned rows are tinted amber.
 
 ### 5.4 Row actions
 - `pending`: **Mark issued**
@@ -95,7 +95,7 @@ App title, the three company names (click to edit; saved for everyone), light/da
 No other transitions are allowed. The server rejects them.
 
 ### 5.5 New cheque form
-Company, cheque no., payee, amount, cheque date (defaults to today), bank account, particulars, status (`issued` or `pending`). Cheque no., payee, date and a positive amount are required. Errors show beside the form and nothing is saved until they are fixed.
+Company, cheque no., payee, amount, cheque date (defaults to today), bank account, particulars, status (`issued` or `pending`). Cheque no., payee, date and a positive amount are required. Errors show beside the form and nothing is saved until they are fixed. A cheque is rejected as a duplicate when the same company already has that cheque no. on a cheque that is not voided.
 
 ### 5.6 Look
 Mint green and purple, light and dark modes, usable on a phone. Fonts are self-hosted (Google Fonts fails behind the office HTTPS inspection).
@@ -103,10 +103,10 @@ Mint green and purple, light and dark modes, usable on a phone. Fonts are self-h
 ## 6. Moving the 585 cheques
 
 1. Export every cheque and the company names from the live claude.ai page's database as it stands on the day of the move, so status and company changes made since the original import come along. Cheques added by hand in the page come along too, with their existing ids.
-2. Save the export to `data/import/cheques.json`. This path is git-ignored. Real payees and amounts never go to GitHub.
-3. `scripts/import` inserts or replaces by `id`, so running it twice never duplicates rows.
-4. After loading, print the count and per-company totals and compare them with the source spec §7 (585 cheques, PHP 43,403,796.08), allowing for edits made since the import.
-5. Upload the file to the Fly volume and run the same script there.
+2. Save the export to `data/cheques-import.json`. This path is git-ignored. Real payees and amounts never go to GitHub.
+3. When the app starts and finds that file next to its database, it inserts or replaces by `id`, so loading the same file twice never duplicates rows. It then renames the file so it is not loaded again. If any row is unusable, nothing is loaded and the log names the row.
+4. After loading, the server log prints the count and per-company totals. Compare them with the source spec §7 (585 cheques, PHP 43,403,796.08), allowing for edits made since the import.
+5. On Fly.io: upload the file to `/data/cheques-import.json` and restart the app. The Docker image carries no scripts, which is why the app loads the file itself.
 
 After the move, the claude.ai page is no longer the place to enter cheques. Retiring it is the owner's call.
 
