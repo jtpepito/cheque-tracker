@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { scheduleDailyBackups } from "./backup";
+import { importIfPresent } from "./import";
 import { DEFAULT_COMPANY_NAMES } from "./types";
 
 // One SQLite connection per server process. Kept on globalThis so dev-mode hot reloads
@@ -56,6 +57,13 @@ export function getDb(): DatabaseSync {
     const db = openDatabase(file);
     globalForDb.__chequesDb = db;
     scheduleDailyBackups(db, file);
+    // A file placed next to the database is loaded once at startup (see README, "Loading cheques").
+    try {
+      const result = importIfPresent(db, path.join(path.dirname(file), "cheques-import.json"));
+      if (result) console.log(result.summary);
+    } catch (err) {
+      console.error("[import] failed, nothing was loaded:", err);
+    }
   }
   return globalForDb.__chequesDb;
 }
