@@ -112,3 +112,50 @@ describe("importIfPresent", () => {
     expect(importIfPresent(db, file)).toBeNull();
   });
 });
+
+describe("import strictness", () => {
+  it("reads an amount typed as text", () => {
+    importCheques(db, { cheques: [row({ amount: "1,250.00" })] });
+    expect(listCheques(db)[0].amount).toBe(1250);
+  });
+
+  it("stops on an amount it cannot read, naming the row", () => {
+    expect(() => importCheques(db, { cheques: [row({ amount: "abc" })] })).toThrow(/imp-2.*amount/);
+    expect(() => importCheques(db, { cheques: [row({ amount: -5 })] })).toThrow(/imp-2.*amount/);
+    expect(listCheques(db)).toHaveLength(0);
+  });
+
+  it("stops on a row that is not an object, naming the row", () => {
+    expect(() => importCheques(db, { cheques: [row(), null as unknown as Record<string, unknown>] })).toThrow(/Row 2/);
+  });
+
+  it("stops on a company name that is not text", () => {
+    const companies = { wwj: 5 } as unknown as { wwj: string };
+    expect(() => importCheques(db, { companies, cheques: [] })).toThrow(/company name/);
+    expect(getCompanyNames(db).wwj).toBe("WWJ Trading");
+  });
+
+  it("drops the .0 a spreadsheet adds to a numeric cheque no.", () => {
+    importCheques(db, { cheques: [row({ chequeNo: "663957.0" }), row({ id: "imp-3", chequeNo: "WWJ1.0" })] });
+    expect(listCheques(db).map((c) => c.chequeNo).sort()).toEqual(["663957", "WWJ1.0"]);
+  });
+
+  it("loads nothing when the file cannot be renamed, so it is never loaded twice", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cheques-"));
+    const file = path.join(dir, "cheques-import.json");
+    fs.writeFileSync(file, JSON.stringify({ cheques: [row()] }));
+    // A folder squatting on the renamed file's name makes the rename fail.
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
+    fs.mkdirSync(path.join(dir, `cheques-import.imported-${today}.json`));
+    expect(() => importIfPresent(db, file)).toThrow();
+    expect(listCheques(db)).toHaveLength(0);
+  });
+
+  it("puts the file back when its contents are bad, so it can be fixed and retried", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cheques-"));
+    const file = path.join(dir, "cheques-import.json");
+    fs.writeFileSync(file, JSON.stringify({ cheques: [row({ company: "acme" })] }));
+    expect(() => importIfPresent(db, file)).toThrow(/company/);
+    expect(fs.existsSync(file)).toBe(true);
+  });
+});

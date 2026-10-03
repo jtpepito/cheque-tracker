@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { buildCalendar } from "@/lib/calendar";
+import { latestOnly } from "@/lib/latest";
 import type { Cheque, CompanyNames } from "@/lib/types";
 import { ChequeForm } from "./cheque-form";
 import { FundingCalendar } from "./funding-calendar";
@@ -17,15 +18,20 @@ export function Tracker() {
   const [state, setState] = useState<State | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
+  // A 30-second poll that lands after a newer refresh must not put older data back.
+  const track = useRef(latestOnly()).current;
+
   const refresh = useCallback(async () => {
     try {
-      setState(await api<State>("/api/state"));
+      const res = await track(api<State>("/api/state"));
+      if (!res.fresh) return;
+      setState(res.value);
       setProblem(null);
     } catch (err) {
       // Keep showing the last data; the next cycle tries again.
       setProblem(err instanceof ApiError ? err.message : "Couldn't refresh.");
     }
-  }, []);
+  }, [track]);
 
   useEffect(() => {
     refresh();

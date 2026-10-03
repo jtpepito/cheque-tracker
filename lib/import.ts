@@ -3,14 +3,24 @@ import fs from "node:fs";
 import type { DatabaseSync } from "node:sqlite";
 import { getCompanyNames, listCheques, setCompanyNames, upsertCheque } from "./cheques";
 import { isValidDate, todayManila } from "./dates";
-import { peso, sumAmounts } from "./money";
+import { parseAmount, peso, sumAmounts } from "./money";
 import { COMPANIES, isCompany, isStatus, type Cheque, type CompanyNames } from "./types";
 
 export type ImportFile = { companies?: Partial<CompanyNames>; cheques: Array<Record<string, unknown>> };
 
 const str = (v: unknown) => (v == null ? "" : String(v).trim());
 
+/** Blank stays blank (two source rows have no amount); anything else must be a readable amount. */
+function amountOf(raw: unknown, where: string): number | null {
+  if (raw == null || raw === "") return null;
+  if (typeof raw === "number" && Number.isFinite(raw) && raw >= 0) return raw;
+  const parsed = typeof raw === "string" ? parseAmount(raw) : null;
+  if (parsed === null) throw new Error(`${where}: cannot read amount "${str(raw)}"`);
+  return parsed;
+}
+
 function toCheque(raw: Record<string, unknown>, index: number): Cheque {
+  if (!raw || typeof raw !== "object") throw new Error(`Row ${index + 1}: not a cheque`);
   const id = str(raw.id);
   const where = `Row ${index + 1}${id ? ` (${id})` : ""}`;
   if (!id) throw new Error(`${where}: missing id`);
@@ -23,9 +33,10 @@ function toCheque(raw: Record<string, unknown>, index: number): Cheque {
   return {
     id,
     company: raw.company,
-    chequeNo: str(raw.chequeNo),
+    // A spreadsheet exports a numeric cheque no. as "663957.0".
+    chequeNo: str(raw.chequeNo).replace(/^(\d+)\.0$/, "$1"),
     payee: str(raw.payee),
-    amount: typeof raw.amount === "number" && Number.isFinite(raw.amount) ? raw.amount : null,
+    amount: amountOf(raw.amount, where),
     issueDate,
     encodedDate: isValidDate(raw.encodedDate) ? raw.encodedDate : null,
     bankAccount: str(raw.bankAccount),
@@ -54,6 +65,9 @@ function summarize(db: DatabaseSync): string {
 export function importCheques(db: DatabaseSync, file: ImportFile): { count: number; summary: string } {
   if (!Array.isArray(file.cheques)) throw new Error('The import file needs a "cheques" list.');
   const cheques = file.cheques.map(toCheque);
+  for (const [key, name] of Object.entries(file.companies ?? {})) {
+    if (typeof name !== "string" || !name.trim()) throw new Error(`Bad company name for "${key}" in the import file.`);
+  }
   db.exec("BEGIN");
   try {
     for (const c of cheques) upsertCheque(db, c);
@@ -66,10 +80,19 @@ export function importCheques(db: DatabaseSync, file: ImportFile): { count: numb
   return { count: cheques.length, summary: summarize(db) };
 }
 
-/** Loads the file if it exists, then renames it so the next start does not load it again. */
+/**
+ * Loads the file if it exists. It is renamed first, so a file that cannot be renamed is never
+ * loaded (and so never loaded again on every restart); if its contents are bad it is put back
+ * under its own name to be fixed and retried.
+ */
 export function importIfPresent(db: DatabaseSync, jsonPath: string): { count: number; summary: string } | null {
   if (!fs.existsSync(jsonPath)) return null;
-  const result = importCheques(db, JSON.parse(fs.readFileSync(jsonPath, "utf8")) as ImportFile);
-  fs.renameSync(jsonPath, jsonPath.replace(/\.json$/, `.imported-${todayManila()}.json`));
-  return result;
+  const done = jsonPath.replace(/\.json$/, `.imported-${todayManila()}.json`);
+  fs.renameSync(jsonPath, done);
+  try {
+    return importCheques(db, JSON.parse(fs.readFileSync(done, "utf8")) as ImportFile);
+  } catch (err) {
+    fs.renameSync(done, jsonPath);
+    throw err;
+  }
 }

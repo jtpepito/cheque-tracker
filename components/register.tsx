@@ -40,7 +40,9 @@ export function Register({
     try {
       await api<Cheque>(`/api/cheques/${encodeURIComponent(id)}`, "PATCH", body);
     } catch (err) {
-      setRowError({ id, message: err instanceof ApiError ? err.message : "Something went wrong. Try again." });
+      const c = cheques.find((x) => x.id === id);
+      const message = err instanceof ApiError ? err.message : "Something went wrong. Try again.";
+      setRowError({ id, message: c ? `Cheque ${c.chequeNo || "(no number)"}, ${c.payee}: ${message}` : message });
     }
     // Refresh either way: after a refusal the row shows what someone else already did.
     await onChanged();
@@ -107,6 +109,13 @@ export function Register({
         </span>
       </div>
 
+      {/* Shown above the list, not in the row: a refused row may now be hidden by the filters. */}
+      {rowError && (
+        <p role="alert" className="rounded-lg border border-danger p-3 text-sm text-danger">
+          {rowError.message}
+        </p>
+      )}
+
       <div className={`hidden px-3 text-xs font-medium text-muted ${GRID}`}>
         <span>Cheque date</span>
         <span>Company</span>
@@ -171,11 +180,6 @@ export function Register({
                   </button>
                 ))}
               </div>
-              {rowError?.id === c.id && (
-                <p role="alert" className="text-sm text-danger md:col-span-7">
-                  {rowError.message}
-                </p>
-              )}
             </li>
           ))}
         </ul>
