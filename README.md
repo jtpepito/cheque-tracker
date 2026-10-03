@@ -48,3 +48,30 @@ Load the cheques (once):
 Look for the `[import]` line in the logs. Later deploys are only the `deploy` command.
 
 Backups: a copy of the database is written to `/data/backups/` each day; the last 30 are kept.
+
+## Sync from the Google Sheet
+
+Cheques and their status come from the "Check Issuances" tab of the Supplier Invoices Register Log.
+A script in the sheet sends the tab to this app within about a minute of an edit. The app never
+writes to the sheet; the script writes only its "Tracker ID" column. Design:
+`docs/superpowers/specs/2026-10-03-sheet-sync-design.md`.
+
+Set up, once the app is deployed and the cheques are loaded:
+
+1. Set the secret on Fly.io (at least 32 characters; keep it private):
+   ```
+   & $fly secrets set SYNC_KEY="<long random text>" --app wwj-cheques
+   ```
+2. **Try it on a copy first.** In Google Sheets: File > Make a copy. In the copy: Extensions > Apps
+   Script, paste `sheet-script/Code.gs`, save. Under Project Settings > Script Properties add
+   `APP_URL` (e.g. `https://wwj-cheques.fly.dev`) and `SYNC_KEY`. Reload the sheet; a "Cheque tracker"
+   menu appears. Run "Give existing rows their IDs (one time)", then "Check against the tracker (no
+   changes)". Use only the check on the copy.
+3. Expect: Removed 0; Added only cheques entered since the cheques were loaded; Changed only where
+   the sheet was edited since, or where the company rules differ from the first import.
+4. Repeat step 2 in the real sheet, using an account that will keep edit access (the sync runs as
+   that account). Run the check again, then "Sync now", then "Turn automatic sync on".
+
+If many rows are deleted on purpose, a sync is refused once it would remove more than 20 cheques;
+use "Sync now, allowing removals". Rows the app cannot read are listed on the page under "Sheet rows
+to fix" and skipped until corrected.
