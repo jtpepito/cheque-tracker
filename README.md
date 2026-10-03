@@ -2,7 +2,7 @@
 
 How much will clear, from which company, on each of the next 14 days. One shared password.
 
-Design: `docs/superpowers/specs/2026-10-03-cheque-tracker-design.md`
+Designs: `docs/superpowers/specs/` (the tracker, the sheet sync, and hosting on Vercel with Supabase).
 
 ## Run locally
 
@@ -11,43 +11,36 @@ npm.cmd install
 npm.cmd run dev
 ```
 
-Open http://localhost:3002 and sign in with `admin`. Data is in `data/cheques.db` (git-ignored).
+Open http://localhost:3002 and sign in with `admin`. With no `DATABASE_URL`, data is kept in an
+in-process Postgres in `data/pglite` (git-ignored). Tests: `npm.cmd test`.
 
-Tests: `npm.cmd test`
+To load cheques into the local database, stop the dev server and run:
 
-## Loading cheques
-
-Put a file named `cheques-import.json` next to the database (`data/` locally, `/data` on Fly.io) and
-restart the app. It is loaded once, by id, so loading the same file again never duplicates rows. The
-file is then renamed `cheques-import.imported-<date>.json`, and the server log prints a line starting
-`[import]` with the count and totals by company. If a row is unusable, nothing is loaded and the log
-says which row.
+```
+npm.cmd run load-cheques -- <file.json> --local
+```
 
 Real payees and amounts stay out of git: `data/` is ignored.
 
-## Deploy to Fly.io
+## Production: Vercel + Supabase
 
-`flyctl` is at `%USERPROFILE%\.fly\bin\flyctl.exe` (not on PATH). First time:
+Data lives in the Supabase project `cheque-tracker` (Singapore); the site runs on Vercel
+(project `cheque-tracker`, team `wwj10`, region `sin1`).
 
-```
-$fly = "$env:USERPROFILE\.fly\bin\flyctl.exe"
-& $fly apps create wwj-cheques
-& $fly volumes create cheques_data --app wwj-cheques --region sin --size 1
-& $fly secrets set ADMIN_PASSWORD="<choose a password>" SESSION_SECRET="<long random text>" --app wwj-cheques
-& $fly deploy --app wwj-cheques --ha=false --remote-only --depot=false
-```
-
-Load the cheques (once):
+Secrets are set in Vercel (Production): `ADMIN_PASSWORD`, `SESSION_SECRET`, `SYNC_KEY`, `DATABASE_URL`.
+`DATABASE_URL` is the Supabase **transaction pooler** string (port 6543). For the two commands below it
+is also kept in `.env.production.local` on this PC, which is git-ignored.
 
 ```
-& $fly ssh sftp put data\cheques-import.json /data/cheques-import.json --app wwj-cheques
-& $fly apps restart wwj-cheques
-& $fly logs --app wwj-cheques
+npm.cmd run migrate
+npm.cmd run load-cheques -- <file.json>
 ```
 
-Look for the `[import]` line in the logs. Later deploys are only the `deploy` command.
+`migrate` applies new files from `db/migrations`. `load-cheques` loads by id, all or nothing, keeps
+companies chosen by hand, and prints the count and totals by company. Backups are Supabase's daily ones.
 
-Backups: a copy of the database is written to `/data/backups/` each day; the last 30 are kept.
+The app refuses to run in production without `DATABASE_URL`, so it can never keep data somewhere
+that resets.
 
 ## Sync from the Google Sheet
 
@@ -58,13 +51,10 @@ writes to the sheet; the script writes only its "Tracker ID" column. Design:
 
 Set up, once the app is deployed and the cheques are loaded:
 
-1. Set the secret on Fly.io (at least 32 characters; keep it private):
-   ```
-   & $fly secrets set SYNC_KEY="<long random text>" --app wwj-cheques
-   ```
+1. `SYNC_KEY` must be set in Vercel (Production). It is at least 32 characters; keep it private.
 2. **Try it on a copy first.** In Google Sheets: File > Make a copy. In the copy: Extensions > Apps
    Script, paste `sheet-script/Code.gs`, save. Under Project Settings > Script Properties add
-   `APP_URL` (e.g. `https://wwj-cheques.fly.dev`) and `SYNC_KEY`. Reload the sheet; a "Cheque tracker"
+   `APP_URL` (the site's https address, with no path) and `SYNC_KEY`. Reload the sheet; a "Cheque tracker"
    menu appears. Run "Give existing rows their IDs (one time)", then "Check against the tracker (no
    changes)". Use only the check on the copy. The check writes nothing, in the sheet or the app.
    ("Sync now" on a copy asks whether to make it the spreadsheet the tracker follows: choose Cancel.)
