@@ -42,6 +42,13 @@ companies chosen by hand, and prints the count and totals by company. Backups ar
 The app refuses to run in production without `DATABASE_URL`, so it can never keep data somewhere
 that resets.
 
+Optional but recommended: `DATABASE_CA_CERT`, the text of Supabase's CA certificate (Supabase dashboard >
+Database settings > SSL configuration > download certificate). With it, the app verifies it is really
+talking to Supabase. Without it, the connection is encrypted but the server is not verified. Set it in
+Vercel, and in `.env.production.local` with line breaks written as `\n`.
+
+Deploys upload only what `.vercelignore` allows; `data/` and every `.env*` file are excluded.
+
 ## Sync from the Google Sheet
 
 Cheques and their status come from the "Check Issuances" tab of the Supplier Invoices Register Log.
