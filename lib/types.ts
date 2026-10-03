@@ -11,7 +11,7 @@ export type Cheque = {
   payee: string;
   /** PHP. Null only on two imported rows that have no amount in the source sheet. */
   amount: number | null;
-  /** The cheque date, YYYY-MM-DD. Drives the calendar. */
+  /** The cheque date, YYYY-MM-DD. Drives the calendar. Empty on imported rows that have none. */
   issueDate: string;
   /** The date logged in the sheet. Imported rows only. */
   encodedDate: string | null;

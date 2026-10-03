@@ -63,6 +63,11 @@ describe("importCheques", () => {
     expect(all.find((c) => c.id === "imp-4")!.amount).toBeNull();
   });
 
+  it("keeps a row whose cheque date is blank in the source, with an empty date", () => {
+    importCheques(db, { cheques: [row({ issueDate: null }), row({ id: "imp-5", issueDate: "" })] });
+    expect(listCheques(db).map((c) => c.issueDate)).toEqual(["", ""]);
+  });
+
   it("fills optional fields that are missing", () => {
     importCheques(db, { cheques: [{ id: "x1", company: "wwj", chequeNo: "1", payee: "P", amount: 5, issueDate: "2026-10-05", status: "issued" }] });
     expect(listCheques(db)[0]).toMatchObject({ bankAccount: "", particulars: "", encodedDate: null, imported: false, sourceRow: null });

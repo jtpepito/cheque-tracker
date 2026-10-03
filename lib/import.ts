@@ -16,14 +16,17 @@ function toCheque(raw: Record<string, unknown>, index: number): Cheque {
   if (!id) throw new Error(`${where}: missing id`);
   if (!isCompany(raw.company)) throw new Error(`${where}: unknown company "${str(raw.company)}"`);
   if (!isStatus(raw.status)) throw new Error(`${where}: unknown status "${str(raw.status)}"`);
-  if (!isValidDate(raw.issueDate)) throw new Error(`${where}: bad cheque date "${str(raw.issueDate)}"`);
+  // A few rows in the source sheet have no cheque date. They are kept with an empty date (never
+  // in the calendar); a date that is present but malformed is still an error.
+  const issueDate = str(raw.issueDate);
+  if (issueDate && !isValidDate(issueDate)) throw new Error(`${where}: bad cheque date "${issueDate}"`);
   return {
     id,
     company: raw.company,
     chequeNo: str(raw.chequeNo),
     payee: str(raw.payee),
     amount: typeof raw.amount === "number" && Number.isFinite(raw.amount) ? raw.amount : null,
-    issueDate: raw.issueDate,
+    issueDate,
     encodedDate: isValidDate(raw.encodedDate) ? raw.encodedDate : null,
     bankAccount: str(raw.bankAccount),
     particulars: str(raw.particulars),
