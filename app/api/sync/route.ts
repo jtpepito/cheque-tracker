@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { getSql } from "@/lib/db";
 import { applySync, parsePayload, recordRefusal, SyncRefused } from "@/lib/sync";
 import { checkSyncKey } from "@/lib/sync-key";
 
@@ -26,10 +26,10 @@ export async function POST(req: Request) {
   if (!payload) return refuse(400, "The sync was not understood.");
 
   try {
-    return NextResponse.json(applySync(getDb(), payload));
+    return NextResponse.json(await applySync(await getSql(), payload));
   } catch (err) {
     if (err instanceof SyncRefused) {
-      if (!payload.dryRun) recordRefusal(getDb(), err.message);
+      if (!payload.dryRun) await recordRefusal(await getSql(), err.message);
       return refuse(err.status, err.message);
     }
     console.error("[sync] failed:", err);

@@ -7,4 +7,4 @@ data/
 .env*
 !.env.development
 !.env.example
-.next-sa/
+.vercel/

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { validateHoliday } from "@/lib/banking";
 import { addHoliday } from "@/lib/cheques";
-import { getDb } from "@/lib/db";
+import { getSql } from "@/lib/db";
 import { badRequest, guarded, readObject } from "@/lib/http";
 
 export function POST(req: Request) {
@@ -10,6 +10,6 @@ export function POST(req: Request) {
     if (!body) return badRequest("The request was not understood.");
     const v = validateHoliday(body);
     if (!v.ok) return badRequest(v.error);
-    return NextResponse.json(addHoliday(getDb(), v.value), { status: 201 });
+    return NextResponse.json(await addHoliday(await getSql(), v.value), { status: 201 });
   });
 }

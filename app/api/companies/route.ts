@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { setCompanyNames } from "@/lib/cheques";
-import { getDb } from "@/lib/db";
+import { getSql } from "@/lib/db";
 import { badRequest, guarded, readObject } from "@/lib/http";
 import type { CompanyNames } from "@/lib/types";
 
@@ -17,6 +17,6 @@ export function PUT(req: Request) {
       if (!value || value.length > 60) return badRequest("Each company needs a name of up to 60 characters.");
       names[key] = value;
     }
-    return NextResponse.json(setCompanyNames(getDb(), names));
+    return NextResponse.json(await setCompanyNames(await getSql(), names));
   });
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { setCompany } from "@/lib/cheques";
-import { getDb } from "@/lib/db";
+import { getSql } from "@/lib/db";
 import { badRequest, guarded, readObject } from "@/lib/http";
 import { isCompany } from "@/lib/types";
 
@@ -11,6 +11,6 @@ export function PATCH(req: Request, { params }: { params: Promise<{ id: string }
     const body = await readObject(req);
     if (!body) return badRequest("The request was not understood.");
     if (!isCompany(body.company)) return badRequest("Unknown company.");
-    return NextResponse.json(setCompany(getDb(), id, body.company));
+    return NextResponse.json(await setCompany(await getSql(), id, body.company));
   });
 }
