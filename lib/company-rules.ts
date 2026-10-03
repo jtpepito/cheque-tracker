@@ -10,7 +10,7 @@ export type SiRefs = Partial<Record<Trading, string>>;
 
 // "WWJ Corp" is tested before "WWJ", which it contains.
 const NAMES: Array<[Trading, RegExp]> = [
-  ["wwjcorp", /wwj\s*corp/i],
+  ["wwjcorp", /wwj[\s\-_.]*corp/i],
   ["wythlae", /wythlae/i],
   ["wwj", /wwj/i],
 ];

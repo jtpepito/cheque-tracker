@@ -3,7 +3,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { listCheques, setCompany, upsertCheque } from "@/lib/cheques";
 import { openDatabase } from "@/lib/db";
 import type { SheetRow } from "@/lib/sheet-rows";
-import { applySync, getLastSync, parsePayload, SyncRefused, type SyncPayload } from "@/lib/sync";
+import { applySync, getLastRefusal, getLastSync, parsePayload, recordRefusal, SyncRefused, type SyncPayload } from "@/lib/sync";
 import { cheque } from "./helpers";
 
 const sheetRow = (n: number, over: SheetRow = {}): SheetRow => ({
@@ -165,5 +165,17 @@ describe("parsePayload", () => {
   });
   it("rejects anything else", () => {
     for (const bad of [null, [], "x", {}, { rows: "x" }, { rows: [], siRefs: [] }]) expect(parsePayload(bad)).toBeNull();
+  });
+});
+
+describe("refusals", () => {
+  it("remembers the last refusal until a real sync goes through", () => {
+    expect(getLastRefusal(db)).toBeNull();
+    recordRefusal(db, "This sync would remove 30 cheques.", 4000);
+    expect(getLastRefusal(db)).toEqual({ at: 4000, message: "This sync would remove 30 cheques." });
+    applySync(db, payload([sheetRow(2)], { dryRun: true }), 5000);
+    expect(getLastRefusal(db)).not.toBeNull();
+    applySync(db, payload([sheetRow(2)]), 6000);
+    expect(getLastRefusal(db)).toBeNull();
   });
 });

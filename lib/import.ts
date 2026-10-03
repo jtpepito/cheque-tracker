@@ -71,7 +71,12 @@ export function importCheques(db: DatabaseSync, file: ImportFile): { count: numb
   }
   db.exec("BEGIN");
   try {
-    for (const c of cheques) upsertCheque(db, c);
+    // The file wins for everything except a company chosen by hand in the app.
+    const locked = new Map(listCheques(db).filter((c) => c.companyLocked).map((c) => [c.id, c]));
+    for (const c of cheques) {
+      const keep = locked.get(c.id);
+      upsertCheque(db, keep ? { ...c, company: keep.company, companyBasis: keep.companyBasis, companyLocked: true } : c);
+    }
     if (file.companies) setCompanyNames(db, { ...getCompanyNames(db), ...file.companies });
     db.exec("COMMIT");
   } catch (err) {

@@ -135,13 +135,32 @@ export function applySync(db: DatabaseSync, payload: SyncPayload, now: number = 
       db.prepare(
         "INSERT INTO config (key, value) VALUES ('last_sync', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
       ).run(JSON.stringify(report));
+      db.prepare("DELETE FROM config WHERE key = 'last_sync_refusal'").run();
       db.exec("COMMIT");
     }
   } catch (err) {
-    db.exec("ROLLBACK");
+    try {
+      db.exec("ROLLBACK");
+    } catch {
+      // Already rolled back; keep the original error.
+    }
     throw err;
   }
   return report;
+}
+
+export type SyncRefusal = { at: number; message: string };
+
+/** Remembered so the page can say why the sheet's changes are not arriving. Cleared by the next real sync. */
+export function recordRefusal(db: DatabaseSync, message: string, now: number = Date.now()): void {
+  db.prepare(
+    "INSERT INTO config (key, value) VALUES ('last_sync_refusal', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+  ).run(JSON.stringify({ at: now, message }));
+}
+
+export function getLastRefusal(db: DatabaseSync): SyncRefusal | null {
+  const row = db.prepare("SELECT value FROM config WHERE key = 'last_sync_refusal'").get() as { value: string } | undefined;
+  return row ? (JSON.parse(row.value) as SyncRefusal) : null;
 }
 
 export function getLastSync(db: DatabaseSync): SyncReport | null {

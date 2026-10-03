@@ -1,4 +1,4 @@
-import type { SyncReport } from "./sync";
+import type { SyncRefusal, SyncReport } from "./sync";
 
 /** After this long without a sync the page warns that it may be out of date. */
 export const STALE_MS = 90 * 60 * 1000;
@@ -25,7 +25,14 @@ function ago(ms: number): string {
   return `${hours} ${hours === 1 ? "hour" : "hours"} ago`;
 }
 
-export function syncLine(sync: SyncReport | null, now: number): { text: string; warn: boolean } {
+export function syncLine(
+  sync: SyncReport | null,
+  now: number,
+  refusal: SyncRefusal | null = null,
+): { text: string; warn: boolean } {
+  if (refusal) {
+    return { text: `The sheet's last sync was refused at ${manilaTime(refusal.at)}: ${refusal.message}`, warn: true };
+  }
   if (!sync) return { text: "Not yet connected to the sheet.", warn: false };
   const age = Math.max(0, now - sync.at);
   if (age > STALE_MS) {

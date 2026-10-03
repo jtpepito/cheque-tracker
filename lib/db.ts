@@ -57,6 +57,11 @@ export function openDatabase(file: string): DatabaseSync {
   const columns = db.prepare("PRAGMA table_info(cheques)").all() as Array<{ name: string }>;
   if (!columns.some((c) => c.name === "company_locked")) {
     db.exec("ALTER TABLE cheques ADD COLUMN company_locked INTEGER NOT NULL DEFAULT 0");
+    // A cheque the import left Unassigned (basis "none") that now has a company was assigned by
+    // hand before the lock existed. Lock it, so the first sheet sync does not undo that choice.
+    db.exec(
+      "UPDATE cheques SET company_locked = 1, company_basis = 'manual' WHERE company_basis = 'none' AND company <> 'unassigned'",
+    );
   }
   db.prepare("INSERT OR IGNORE INTO config (key, value) VALUES ('companies', ?)").run(
     JSON.stringify(DEFAULT_COMPANY_NAMES),

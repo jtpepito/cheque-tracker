@@ -74,9 +74,18 @@ describe("cheques store", () => {
       imported INTEGER NOT NULL DEFAULT 0, company_basis TEXT, source_row INTEGER)`);
     old.exec(`INSERT INTO cheques (id, company, cheque_no, payee, amount, issue_date, status, created_at)
               VALUES ('imp-2', 'wwj', '1', 'Sample Supplier', 5, '2026-10-05', 'issued', 0)`);
+    // Chosen by hand before the lock existed: the import left it Unassigned (basis "none").
+    old.exec(`INSERT INTO cheques (id, company, cheque_no, payee, amount, issue_date, status, created_at, company_basis)
+              VALUES ('imp-3', 'wythlae', '2', 'Sample Supplier', 5, '2026-10-05', 'issued', 0, 'none'),
+                     ('imp-4', 'unassigned', '3', 'Sample Supplier', 5, '2026-10-05', 'issued', 0, 'none'),
+                     ('imp-5', 'wwj', '4', 'Sample Supplier', 5, '2026-10-05', 'issued', 0, 'checkno-label')`);
     old.close();
     const reopened = openDatabase(file);
-    expect(listCheques(reopened)).toMatchObject([{ id: "imp-2", companyLocked: false }]);
+    const byId = Object.fromEntries(listCheques(reopened).map((c) => [c.id, c]));
+    expect(byId["imp-2"].companyLocked).toBe(false);
+    expect(byId["imp-3"]).toMatchObject({ company: "wythlae", companyLocked: true, companyBasis: "manual" });
+    expect(byId["imp-4"].companyLocked).toBe(false);
+    expect(byId["imp-5"]).toMatchObject({ companyLocked: false, companyBasis: "checkno-label" });
     reopened.close();
   });
 });

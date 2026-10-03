@@ -1,9 +1,17 @@
-import type { SyncReport } from "@/lib/sync";
+import type { SyncRefusal, SyncReport } from "@/lib/sync";
 import { syncLine } from "@/lib/sync-status";
 
 /** When the sheet last synced, and any sheet rows the app could not read. */
-export function SyncStatus({ sync, now }: { sync: SyncReport | null; now: number }) {
-  const line = syncLine(sync, now);
+export function SyncStatus({
+  sync,
+  refusal,
+  now,
+}: {
+  sync: SyncReport | null;
+  refusal: SyncRefusal | null;
+  now: number;
+}) {
+  const line = syncLine(sync, now, refusal);
   const problems = sync?.problems ?? [];
   return (
     <div className="space-y-2 text-sm">

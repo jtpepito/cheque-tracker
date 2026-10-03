@@ -66,12 +66,19 @@ Set up, once the app is deployed and the cheques are loaded:
    Script, paste `sheet-script/Code.gs`, save. Under Project Settings > Script Properties add
    `APP_URL` (e.g. `https://wwj-cheques.fly.dev`) and `SYNC_KEY`. Reload the sheet; a "Cheque tracker"
    menu appears. Run "Give existing rows their IDs (one time)", then "Check against the tracker (no
-   changes)". Use only the check on the copy.
+   changes)". Use only the check on the copy. The check writes nothing, in the sheet or the app.
+   ("Sync now" on a copy asks whether to make it the spreadsheet the tracker follows: choose Cancel.)
 3. Expect: Removed 0; Added only cheques entered since the cheques were loaded; Changed only where
    the sheet was edited since, or where the company rules differ from the first import.
 4. Repeat step 2 in the real sheet, using an account that will keep edit access (the sync runs as
    that account). Run the check again, then "Sync now", then "Turn automatic sync on".
+   The first "Sync now" asks to make this the spreadsheet the tracker follows: choose OK. Only that
+   spreadsheet can sync; any copy of it can only be checked.
 
 If many rows are deleted on purpose, a sync is refused once it would remove more than 20 cheques;
 use "Sync now, allowing removals". Rows the app cannot read are listed on the page under "Sheet rows
 to fix" and skipped until corrected.
+
+If a sync is refused, the page says why under the header until the next sync goes through. The one-time
+"Give existing rows their IDs" step refuses to run twice; if the "Tracker ID" heading is ever deleted,
+put the heading back rather than re-running it.

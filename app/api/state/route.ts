@@ -3,7 +3,7 @@ import { getCompanyNames, listCheques, listHolidays } from "@/lib/cheques";
 import { todayManila } from "@/lib/dates";
 import { getDb } from "@/lib/db";
 import { guarded } from "@/lib/http";
-import { getLastSync } from "@/lib/sync";
+import { getLastRefusal, getLastSync } from "@/lib/sync";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +17,7 @@ export function GET() {
         companies: getCompanyNames(db),
         holidays: listHolidays(db),
         sync: getLastSync(db),
+        refusal: getLastRefusal(db),
         cheques: listCheques(db),
       },
       { headers: { "cache-control": "no-store" } },

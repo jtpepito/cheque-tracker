@@ -5,7 +5,7 @@ import { api, ApiError } from "@/lib/api";
 import type { Holiday } from "@/lib/banking";
 import { buildCalendar } from "@/lib/calendar";
 import { latestOnly } from "@/lib/latest";
-import type { SyncReport } from "@/lib/sync";
+import type { SyncRefusal, SyncReport } from "@/lib/sync";
 import type { Cheque, CompanyNames } from "@/lib/types";
 import { FundingCalendar } from "./funding-calendar";
 import { Header } from "./header";
@@ -19,6 +19,7 @@ type State = {
   companies: CompanyNames;
   holidays: Holiday[];
   sync: SyncReport | null;
+  refusal: SyncRefusal | null;
   cheques: Cheque[];
 };
 
@@ -65,7 +66,7 @@ export function Tracker() {
           {problem} Showing the last data loaded; trying again shortly.
         </p>
       )}
-      <SyncStatus sync={state.sync} now={state.now} />
+      <SyncStatus sync={state.sync} refusal={state.refusal} now={state.now} />
       <FundingCalendar days={buildCalendar(state.cheques, state.today, state.holidays)} names={state.companies} />
       <Register cheques={state.cheques} names={state.companies} holidays={state.holidays} onChanged={refresh} />
       <Holidays holidays={state.holidays} today={state.today} onChanged={refresh} />

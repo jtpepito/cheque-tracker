@@ -2,6 +2,7 @@
 // APP_URL and SYNC_KEY under Project Settings > Script Properties.
 // It reads the Check Issuances tab, fills the "Tracker ID" column and sends the rows to the
 // tracker. Every rule about what a row means lives in the tracker, not here.
+// The only cells this script ever writes are in the "Tracker ID" column.
 
 const TAB = "Check Issuances";
 const SI_TABS = { wwj: ["WWJ SI"], wythlae: ["Wythlae SI"], wwjcorp: ["WWJ Corp SI"] };
@@ -31,13 +32,21 @@ function onOpen() {
     .addToUi();
 }
 
+function props_() {
+  return PropertiesService.getScriptProperties();
+}
+
 function norm_(value) {
   return String(value).trim().toLowerCase();
 }
 
+function headerRow_(sheet) {
+  return sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getDisplayValues()[0].map(norm_);
+}
+
 /** Column index (0-based) of each named header in row 1. Throws, naming any that is missing. */
 function findColumns_(sheet, wanted) {
-  const header = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getDisplayValues()[0].map(norm_);
+  const header = headerRow_(sheet);
   const found = {};
   Object.keys(wanted).forEach(function (key) {
     const index = header.indexOf(norm_(wanted[key]));
@@ -53,10 +62,9 @@ function tab_(name) {
   return sheet;
 }
 
-/** 0-based index of the Tracker ID column, or -1 when it does not exist yet. */
+/** 0-based index of the Tracker ID column, or -1 when it does not exist. */
 function idColumn_(sheet) {
-  const header = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getDisplayValues()[0].map(norm_);
-  return header.indexOf(norm_(ID_HEADER));
+  return headerRow_(sheet).indexOf(norm_(ID_HEADER));
 }
 
 function newId_() {
@@ -67,14 +75,21 @@ function newId_() {
 }
 
 /**
- * Reads the cheque rows. Fills a blank Tracker ID, and replaces one that repeats an ID
- * higher up (a copied row), then writes the ID column back once.
+ * Reads the cheque rows. When assignIds is true, a row with no Tracker ID gets one, and a row
+ * that repeats an ID found higher up (a copied row) gets a new one. Only those cells are
+ * written, each after checking that the row has not moved since it was read.
  */
-function readRows_() {
+function readRows_(assignIds) {
   const sheet = tab_(TAB);
   const cols = findColumns_(sheet, HEADERS);
   const idCol = idColumn_(sheet);
-  if (idCol < 0) throw new Error('Run "Give existing rows their IDs (one time)" from the ' + MENU + " menu first.");
+  if (idCol < 0) {
+    throw new Error(
+      props_().getProperty("IDS_GIVEN")
+        ? 'The "' + ID_HEADER + '" column heading is missing. Put the heading back above the IDs. Do not run the one-time step again.'
+        : 'Run "Give existing rows their IDs (one time)" from the ' + MENU + " menu first.",
+    );
+  }
 
   const range = sheet.getDataRange();
   const values = range.getValues();
@@ -86,22 +101,18 @@ function readRows_() {
   };
 
   const seen = {};
-  const ids = [];
-  let idsChanged = false;
+  const toWrite = [];
   const rows = [];
   for (let r = 1; r < values.length; r++) {
-    let id = shown[r][idCol] ? shown[r][idCol].trim() : "";
     const isCheque = shown[r][cols.supplier].trim() || shown[r][cols.chequeNo].trim() || shown[r][cols.amount].trim();
-    if (!isCheque) {
-      ids.push([id]);
-      continue;
-    }
-    if (!id || seen[id]) {
+    if (!isCheque) continue;
+    const had = shown[r][idCol] ? shown[r][idCol].trim() : "";
+    let id = had;
+    if (assignIds && (!id || seen[id])) {
       id = newId_();
-      idsChanged = true;
+      toWrite.push({ r: r, had: had, id: id });
     }
-    seen[id] = true;
-    ids.push([id]);
+    if (id) seen[id] = true;
     const amount = values[r][cols.amount];
     rows.push({
       id: id,
@@ -115,7 +126,18 @@ function readRows_() {
       reference: shown[r][cols.reference],
     });
   }
-  if (idsChanged && ids.length) sheet.getRange(2, idCol + 1, ids.length, 1).setValues(ids);
+
+  toWrite.forEach(function (w) {
+    // Someone may have inserted, deleted or sorted rows since the read. Write only if this row
+    // still shows the same supplier, cheque number and ID; otherwise stop and try again later.
+    const now = sheet.getRange(w.r + 1, 1, 1, values[w.r].length).getDisplayValues()[0];
+    const same =
+      now[cols.supplier] === shown[w.r][cols.supplier] &&
+      now[cols.chequeNo] === shown[w.r][cols.chequeNo] &&
+      (now[idCol] ? now[idCol].trim() : "") === w.had;
+    if (!same) throw new Error("The sheet was being edited while it was read. Nothing was sent; it will be tried again.");
+    sheet.getRange(w.r + 1, idCol + 1).setValue(w.id);
+  });
   return rows;
 }
 
@@ -142,17 +164,28 @@ function readSiRefs_() {
   return refs;
 }
 
-/** Sends the tab to the tracker. Returns { ok, code, report | error }. */
+/**
+ * Sends the tab to the tracker. Returns { ok, code, report | error }.
+ * A check (dryRun) changes nothing anywhere: no IDs are written and the tracker rolls back.
+ * A real sync is only sent from the one spreadsheet the tracker follows (BOUND_ID).
+ */
 function send_(options) {
-  const props = PropertiesService.getScriptProperties();
+  const props = props_();
   const url = (props.getProperty("APP_URL") || "").replace(/\/+$/, "");
   const key = props.getProperty("SYNC_KEY") || "";
   if (!url || !key) throw new Error("Set APP_URL and SYNC_KEY in Project Settings > Script Properties.");
+  if (url.indexOf("https://") !== 0) throw new Error("APP_URL must start with https://");
+  if (!options.dryRun && props.getProperty("BOUND_ID") !== SpreadsheetApp.getActive().getId()) {
+    throw new Error(
+      "The tracker follows a different spreadsheet, so this one can only be checked, not synced. " +
+        "(If this is a copy, that is expected.)",
+    );
+  }
 
   const body = {
     dryRun: !!options.dryRun,
     allowRemovals: !!options.allowRemovals,
-    rows: readRows_(),
+    rows: readRows_(!options.dryRun),
     siRefs: readSiRefs_(),
   };
   const response = UrlFetchApp.fetch(url + "/api/sync", {
@@ -163,20 +196,21 @@ function send_(options) {
     muteHttpExceptions: true,
   });
   const code = response.getResponseCode();
-  let data = {};
+  let data = null;
   try {
     data = JSON.parse(response.getContentText());
   } catch (e) {
-    data = { error: "The tracker did not answer properly (HTTP " + code + ")." };
+    data = null;
   }
-  return code === 200 ? { ok: true, code: code, report: data } : { ok: false, code: code, error: data.error || "HTTP " + code };
+  if (code === 200 && data && Array.isArray(data.problems)) return { ok: true, code: code, report: data };
+  return { ok: false, code: code, error: (data && data.error) || "The tracker did not answer properly (HTTP " + code + ")." };
 }
 
 function describe_(result) {
   if (!result.ok) return "The tracker refused this:\n\n" + result.error;
   const r = result.report;
   const lines = [
-    r.dryRun ? "Check only. Nothing was changed." : "Synced.",
+    r.dryRun ? "Check only. Nothing was changed, here or in the tracker." : "Synced.",
     "",
     "Rows read: " + r.rows,
     "Added: " + r.added,
@@ -188,26 +222,63 @@ function describe_(result) {
   r.problems.slice(0, 15).forEach(function (p) {
     lines.push("  Row " + p.row + ": " + p.reason);
   });
-  if (r.problems.length > 15) lines.push("  …and " + (r.problems.length - 15) + " more (see the tracker).");
+  if (r.problems.length > 15) lines.push("  ...and " + (r.problems.length - 15) + " more (see the tracker).");
   return lines.join("\n");
 }
 
-function runFromMenu_(options) {
+function alert_(message) {
   const ui = SpreadsheetApp.getUi();
-  try {
-    ui.alert(MENU, describe_(send_(options)), ui.ButtonSet.OK);
-  } catch (e) {
-    ui.alert(MENU, String(e.message || e), ui.ButtonSet.OK);
+  ui.alert(MENU, message, ui.ButtonSet.OK);
+}
+
+/** Menu runs take the same lock as the timers, so two runs never hand out IDs at once. */
+function runFromMenu_(options) {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(20000)) {
+    alert_("A sync is running right now. Try again in a minute.");
+    return;
   }
+  try {
+    alert_(describe_(send_(options)));
+  } catch (e) {
+    alert_(String(e.message || e));
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** The first real sync makes this spreadsheet the one the tracker follows, after asking. */
+function bindIfNeeded_() {
+  const props = props_();
+  const id = SpreadsheetApp.getActive().getId();
+  const bound = props.getProperty("BOUND_ID");
+  if (bound === id) return true;
+  const ui = SpreadsheetApp.getUi();
+  if (bound) {
+    alert_("The tracker follows a different spreadsheet, so this one can only be checked, not synced. (If this is a copy, that is expected.)");
+    return false;
+  }
+  const answer = ui.alert(
+    MENU,
+    'Make "' + SpreadsheetApp.getActive().getName() + '" the spreadsheet the tracker follows? ' +
+      "Choose Cancel if this is a test copy.",
+    ui.ButtonSet.OK_CANCEL,
+  );
+  if (answer !== ui.Button.OK) return false;
+  props.setProperty("BOUND_ID", id);
+  return true;
 }
 
 function menuCheck() {
   runFromMenu_({ dryRun: true });
 }
+
 function menuSync() {
-  runFromMenu_({});
+  if (bindIfNeeded_()) runFromMenu_({});
 }
+
 function menuSyncAllowingRemovals() {
+  if (!bindIfNeeded_()) return;
   const ui = SpreadsheetApp.getUi();
   const answer = ui.alert(
     MENU,
@@ -219,28 +290,32 @@ function menuSyncAllowingRemovals() {
 
 /**
  * One time: adds the Tracker ID column and gives every existing cheque row "imp-<row number>",
- * the IDs the tracker already holds from the original import. Refuses if any ID exists.
+ * the IDs the tracker already holds from the original import. It refuses to run a second time,
+ * because row numbers change once rows are sorted, inserted or deleted.
  */
 function menuGiveExistingIds() {
-  const ui = SpreadsheetApp.getUi();
+  const props = props_();
   try {
+    if (props.getProperty("IDS_GIVEN")) {
+      throw new Error("This step has already been done for this spreadsheet and must not be repeated.");
+    }
     const sheet = tab_(TAB);
     const cols = findColumns_(sheet, HEADERS);
     let idCol = idColumn_(sheet);
     const last = sheet.getLastRow();
-    if (idCol >= 0 && last >= 2) {
+    if (last < 2) throw new Error("There are no cheque rows yet.");
+    if (idCol >= 0) {
       const existing = sheet.getRange(2, idCol + 1, last - 1, 1).getDisplayValues();
       const used = existing.some(function (row) {
         return row[0].trim() !== "";
       });
       if (used) throw new Error("The Tracker ID column already has IDs. This step is only for the first time.");
-    }
-    if (idCol < 0) {
+    } else {
       idCol = sheet.getLastColumn();
+      if (sheet.getMaxColumns() < idCol + 1) sheet.insertColumnAfter(sheet.getMaxColumns());
       sheet.getRange(1, idCol + 1).setValue(ID_HEADER);
     }
-    if (last < 2) throw new Error("There are no cheque rows yet.");
-    const shown = sheet.getRange(2, 1, last - 1, sheet.getLastColumn()).getDisplayValues();
+    const shown = sheet.getRange(2, 1, last - 1, idCol).getDisplayValues();
     let count = 0;
     const ids = shown.map(function (row, i) {
       const isCheque = row[cols.supplier].trim() || row[cols.chequeNo].trim() || row[cols.amount].trim();
@@ -249,9 +324,16 @@ function menuGiveExistingIds() {
       return ["imp-" + (i + 2)];
     });
     sheet.getRange(2, idCol + 1, ids.length, 1).setValues(ids);
-    ui.alert(MENU, count + " rows were given their IDs. Next: Check against the tracker (no changes).", ui.ButtonSet.OK);
+    props.setProperty("IDS_GIVEN", "1");
+    // A warning (not a block) when someone edits the IDs by hand.
+    sheet
+      .getRange(1, idCol + 1, sheet.getMaxRows(), 1)
+      .protect()
+      .setDescription("Tracker IDs: filled in automatically. Please do not edit.")
+      .setWarningOnly(true);
+    alert_(count + " rows were given their IDs. Next: Check against the tracker (no changes).");
   } catch (e) {
-    ui.alert(MENU, String(e.message || e), ui.ButtonSet.OK);
+    alert_(String(e.message || e));
   }
 }
 
@@ -268,16 +350,17 @@ function watched_() {
 /** Installable on-edit trigger: notes that something changed. The minute timer does the sending. */
 function markChanged(e) {
   if (!e || !e.range) return;
-  if (watched_().indexOf(e.range.getSheet().getName()) >= 0) {
-    PropertiesService.getScriptProperties().setProperty("CHANGED", "1");
-  }
+  if (watched_().indexOf(e.range.getSheet().getName()) >= 0) props_().setProperty("CHANGED", "1");
 }
 
-/** Every minute: sends if something changed. On failure the flag is put back so the next minute retries. */
+/** Installable on-change trigger: deleting, inserting or sorting rows does not count as an edit. */
+function markStructureChanged(e) {
+  if (e && e.changeType && e.changeType !== "EDIT" && e.changeType !== "FORMAT") props_().setProperty("CHANGED", "1");
+}
+
+/** Every minute: sends if something changed. */
 function syncIfChanged() {
-  const props = PropertiesService.getScriptProperties();
-  if (props.getProperty("CHANGED") !== "1") return;
-  autoSync_();
+  if (props_().getProperty("CHANGED") === "1") autoSync_();
 }
 
 /** Every hour: sends regardless. */
@@ -286,17 +369,23 @@ function syncHourly() {
 }
 
 function autoSync_() {
-  const props = PropertiesService.getScriptProperties();
+  const props = props_();
+  // Only the spreadsheet the tracker follows syncs by itself; a copy does nothing.
+  if (props.getProperty("BOUND_ID") !== SpreadsheetApp.getActive().getId()) {
+    props.deleteProperty("CHANGED");
+    return;
+  }
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(1000)) return;
   try {
     // Cleared before sending, so an edit made while sending is not lost.
     props.deleteProperty("CHANGED");
     const result = send_({});
-    if (!result.ok) {
-      props.setProperty("CHANGED", "1");
-      console.error("Cheque tracker sync refused: " + result.error);
-    }
+    if (result.ok) return;
+    console.error("Cheque tracker sync refused (" + result.code + "): " + result.error);
+    // A refusal (4xx) will not fix itself, so it waits for the next edit or the hourly run,
+    // and the tracker's page shows the reason. Anything else is retried next minute.
+    if (result.code < 400 || result.code >= 500) props.setProperty("CHANGED", "1");
   } catch (e) {
     props.setProperty("CHANGED", "1");
     console.error("Cheque tracker sync failed: " + (e.message || e));
@@ -306,23 +395,45 @@ function autoSync_() {
 }
 
 function removeTriggers_() {
+  const mine = ["markChanged", "markStructureChanged", "syncIfChanged", "syncHourly"];
   ScriptApp.getProjectTriggers().forEach(function (trigger) {
-    const fn = trigger.getHandlerFunction();
-    if (fn === "markChanged" || fn === "syncIfChanged" || fn === "syncHourly") ScriptApp.deleteTrigger(trigger);
+    if (mine.indexOf(trigger.getHandlerFunction()) >= 0) ScriptApp.deleteTrigger(trigger);
   });
 }
 
+// Triggers belong to the Google account that created them, so only that account can remove them.
 function menuAutoOn() {
+  const props = props_();
+  const me = Session.getEffectiveUser().getEmail();
+  const by = props.getProperty("AUTO_BY");
+  if (by && by !== me) {
+    alert_("Automatic sync is already on, set up by " + by + ". Ask them to turn it off first.");
+    return;
+  }
+  if (props.getProperty("BOUND_ID") !== SpreadsheetApp.getActive().getId()) {
+    alert_('Run "Sync now" once first, so the tracker follows this spreadsheet.');
+    return;
+  }
   removeTriggers_();
   const ss = SpreadsheetApp.getActive();
   ScriptApp.newTrigger("markChanged").forSpreadsheet(ss).onEdit().create();
+  ScriptApp.newTrigger("markStructureChanged").forSpreadsheet(ss).onChange().create();
   ScriptApp.newTrigger("syncIfChanged").timeBased().everyMinutes(1).create();
   ScriptApp.newTrigger("syncHourly").timeBased().everyHours(1).create();
-  PropertiesService.getScriptProperties().setProperty("CHANGED", "1");
-  SpreadsheetApp.getUi().alert(MENU, "Automatic sync is on. Edits reach the tracker within about a minute.", SpreadsheetApp.getUi().ButtonSet.OK);
+  props.setProperty("AUTO_BY", me);
+  props.setProperty("CHANGED", "1");
+  alert_("Automatic sync is on, running as " + me + ". Edits reach the tracker within about a minute.");
 }
 
 function menuAutoOff() {
+  const props = props_();
+  const me = Session.getEffectiveUser().getEmail();
+  const by = props.getProperty("AUTO_BY");
+  if (by && by !== me) {
+    alert_("Automatic sync was turned on by " + by + ". Only that account can turn it off.");
+    return;
+  }
   removeTriggers_();
-  SpreadsheetApp.getUi().alert(MENU, "Automatic sync is off.", SpreadsheetApp.getUi().ButtonSet.OK);
+  props.deleteProperty("AUTO_BY");
+  alert_("Automatic sync is off.");
 }

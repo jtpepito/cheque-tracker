@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
-import { applySync, parsePayload, SyncRefused } from "@/lib/sync";
+import { applySync, parsePayload, recordRefusal, SyncRefused } from "@/lib/sync";
 import { checkSyncKey } from "@/lib/sync-key";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +28,10 @@ export async function POST(req: Request) {
   try {
     return NextResponse.json(applySync(getDb(), payload));
   } catch (err) {
-    if (err instanceof SyncRefused) return refuse(err.status, err.message);
+    if (err instanceof SyncRefused) {
+      if (!payload.dryRun) recordRefusal(getDb(), err.message);
+      return refuse(err.status, err.message);
+    }
     console.error("[sync] failed:", err);
     return refuse(500, "The sync failed. Nothing was changed.");
   }

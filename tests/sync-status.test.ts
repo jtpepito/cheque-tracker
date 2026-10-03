@@ -30,6 +30,13 @@ describe("syncLine", () => {
       warn: true,
     });
   });
+  it("warns when the last sync from the sheet was refused, whatever its age", () => {
+    expect(syncLine(report(), AT + MIN, { at: AT + 30_000, message: "This sync would remove 30 cheques." })).toEqual({
+      text: "The sheet's last sync was refused at 3 Oct, 2:15 PM: This sync would remove 30 cheques.",
+      warn: true,
+    });
+    expect(syncLine(null, AT, { at: AT, message: "Empty." }).warn).toBe(true);
+  });
   it("copes with a clock that is slightly behind the server", () => {
     expect(syncLine(report(), AT - 5000).text).toBe("Synced from the sheet just now · 587 cheques");
   });

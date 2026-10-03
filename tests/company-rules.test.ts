@@ -17,6 +17,8 @@ describe("deriveCompany", () => {
   it("tests WWJ Corp before WWJ", () => {
     expect(deriveCompany("WWJ Corp 667011", "Sample", {})).toEqual({ company: "wwjcorp", basis: "checkno-label" });
     expect(deriveCompany("123456", "SBC - WWJCORP CBC", {})).toEqual({ company: "wwjcorp", basis: "supplier-label" });
+    expect(deriveCompany("WWJ-Corp 667011", "Sample", {})).toEqual({ company: "wwjcorp", basis: "checkno-label" });
+    expect(deriveCompany("123456", "WWJ - Corp.", {})).toEqual({ company: "wwjcorp", basis: "supplier-label" });
   });
 
   it("then a company name in the supplier", () => {

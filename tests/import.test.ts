@@ -41,11 +41,11 @@ describe("importCheques", () => {
   it("can be run twice without duplicating rows, and the file wins", () => {
     const file: ImportFile = { cheques: [row(), row({ id: "imp-3", sourceRow: 3, chequeNo: "WWJ000002" })] };
     importCheques(db, file);
-    setCompany(db, "imp-2", "wythlae");
+    upsertCheque(db, { ...listCheques(db).find((c) => c.id === "imp-2")!, payee: "Edited" });
     importCheques(db, file);
     const all = listCheques(db);
     expect(all).toHaveLength(2);
-    expect(all.find((c) => c.id === "imp-2")!.company).toBe("wwj");
+    expect(all.find((c) => c.id === "imp-2")!.payee).toBe("Sample Supplier");
   });
 
   it("leaves cheques that are not in the file alone", () => {
@@ -155,5 +155,17 @@ describe("import strictness", () => {
     fs.writeFileSync(file, JSON.stringify({ cheques: [row({ company: "acme" })] }));
     expect(() => importIfPresent(db, file)).toThrow(/company/);
     expect(fs.existsSync(file)).toBe(true);
+  });
+});
+
+describe("import and hand-chosen companies", () => {
+  it("keeps a company chosen by hand when the file is loaded again", () => {
+    const file: ImportFile = { cheques: [row(), row({ id: "imp-3", sourceRow: 3, chequeNo: "WWJ000002" })] };
+    importCheques(db, file);
+    setCompany(db, "imp-2", "wythlae");
+    importCheques(db, { cheques: [row({ amount: 999 }), row({ id: "imp-3", sourceRow: 3, chequeNo: "WWJ000002" })] });
+    const all = listCheques(db);
+    expect(all.find((c) => c.id === "imp-2")).toMatchObject({ company: "wythlae", companyLocked: true, companyBasis: "manual", amount: 999 });
+    expect(all.find((c) => c.id === "imp-3")).toMatchObject({ company: "wwj", companyLocked: false });
   });
 });
