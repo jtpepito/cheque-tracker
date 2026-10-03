@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #f1faf5;
+  --card: #ffffff;
+  --ink: #1f1b2e;
+  --muted: #5f5a72;
+  --line: #cfe8dc;
+  --accent: #6d3fc4;
+  --accent-ink: #ffffff;
+  --mint: #bfead5;
+  --warn: #fff3d6;
+  --warn-ink: #7a4b00;
+  --danger: #b3261e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14121c;
+    --card: #1e1b2b;
+    --ink: #ece9f7;
+    --muted: #a8a2c0;
+    --line: #33304a;
+    --accent: #b79cff;
+    --accent-ink: #1b1330;
+    --mint: #1f4a3a;
+    --warn: #4a3610;
+    --warn-ink: #ffd98a;
+    --danger: #ff8a80;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #14121c;
+  --card: #1e1b2b;
+  --ink: #ece9f7;
+  --muted: #a8a2c0;
+  --line: #33304a;
+  --accent: #b79cff;
+  --accent-ink: #1b1330;
+  --mint: #1f4a3a;
+  --warn: #4a3610;
+  --warn-ink: #ffd98a;
+  --danger: #ff8a80;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-mint: var(--mint);
+  --color-warn: var(--warn);
+  --color-warn-ink: var(--warn-ink);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-geist-sans), "Segoe UI", system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, Consolas, monospace;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+}
+
+input,
+select,
+button {
+  font: inherit;
+}
+
+.field {
+  @apply h-10 w-full rounded-md border border-line bg-card px-3 text-ink;
+}
+
+.btn {
+  @apply inline-flex h-9 items-center justify-center rounded-md border border-line bg-card px-3 text-sm font-medium text-ink disabled:opacity-50;
+}
+
+.btn-primary {
+  @apply border-accent bg-accent text-accent-ink;
+}
