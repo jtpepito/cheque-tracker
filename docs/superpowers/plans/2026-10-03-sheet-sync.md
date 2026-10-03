@@ -402,7 +402,7 @@ export function deriveCompany(
   const digits = chequeNo.replace(/\D/g, "");
   if (digits.length >= 5) {
     // The whole number, not part of a longer one and not the start of an amount like 164,973.75.
-    const whole = new RegExp(`(?<![\\d,.])${digits}(?![\\d,.]\\d)`);
+    const whole = new RegExp(`(?<![\\d,.])${digits}(?!\\d|[,.]\\d)`);
     const hits = (["wwj", "wythlae", "wwjcorp"] as const).filter((co) => whole.test(siRefs[co] ?? ""));
     if (hits.length === 1) return { company: hits[0], basis: "si-crossref" };
   }
@@ -2068,7 +2068,7 @@ function menuAutoOff() {
 
 Check the script parses as JavaScript:
 ```bash
-node --check --input-type=commonjs < sheet-script/Code.gs
+cp sheet-script/Code.gs "$TEMP/cheque-sync-check.js" && node --check "$TEMP/cheque-sync-check.js"
 ```
 Expected: no output (exit code 0).
 
