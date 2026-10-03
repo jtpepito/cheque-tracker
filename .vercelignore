@@ -1,0 +1,11 @@
+data/
+.env*
+!.env.example
+.superpowers/
+docs/
+tests/
+sheet-script/
+.next/
+.next-dev/
+.next-check/
+node_modules/

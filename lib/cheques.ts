@@ -39,19 +39,25 @@ export async function listCheques(sql: Sql): Promise<Cheque[]> {
   return (await sql.query<Row>("SELECT * FROM cheques ORDER BY issue_date, cheque_no")).map(toCheque);
 }
 
-/** Inserts the cheque, or replaces every field of the row with the same id. */
+/**
+ * Inserts the cheque, or replaces the row with the same id. A company chosen by hand (locked)
+ * is never replaced: the database keeps it even if the caller read the row before the choice
+ * was made, which a sheet sync running at the same moment can do.
+ */
 export async function upsertCheque(sql: Sql, c: Cheque): Promise<void> {
   await sql.query(
     `INSERT INTO cheques (id, company, cheque_no, payee, amount, issue_date, encoded_date, bank_account,
                           particulars, status, created_at, imported, company_basis, source_row, company_locked)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
      ON CONFLICT (id) DO UPDATE SET
-       company = excluded.company, cheque_no = excluded.cheque_no, payee = excluded.payee,
+       company = CASE WHEN cheques.company_locked THEN cheques.company ELSE excluded.company END,
+       cheque_no = excluded.cheque_no, payee = excluded.payee,
        amount = excluded.amount, issue_date = excluded.issue_date, encoded_date = excluded.encoded_date,
        bank_account = excluded.bank_account, particulars = excluded.particulars, status = excluded.status,
        created_at = excluded.created_at, imported = excluded.imported,
-       company_basis = excluded.company_basis, source_row = excluded.source_row,
-       company_locked = excluded.company_locked`,
+       company_basis = CASE WHEN cheques.company_locked THEN cheques.company_basis ELSE excluded.company_basis END,
+       source_row = excluded.source_row,
+       company_locked = cheques.company_locked OR excluded.company_locked`,
     [
       c.id, c.company, c.chequeNo, c.payee, c.amount, c.issueDate, c.encodedDate, c.bankAccount,
       c.particulars, c.status, c.createdAt, c.imported, c.companyBasis, c.sourceRow, c.companyLocked,

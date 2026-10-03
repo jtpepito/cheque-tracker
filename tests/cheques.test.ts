@@ -62,6 +62,17 @@ describe("cheques store", () => {
     expect((await getCompanyNames(sql))).toEqual({ wwj: "WWJ", wythlae: "Wythlae", wwjcorp: "Corp" });
   });
 
+  it("never lets a later save overwrite a company chosen by hand", async () => {
+    const c = cheque({ id: "lock-1", company: "unassigned", companyBasis: "none" });
+    await upsertCheque(sql, c);
+    await setCompany(sql, c.id, "wwjcorp");
+    // A sync that read the cheque before the choice was made saves its stale copy.
+    await upsertCheque(sql, { ...c, amount: 250, status: "cleared" });
+    expect((await listCheques(sql))[0]).toMatchObject({
+      company: "wwjcorp", companyBasis: "manual", companyLocked: true, amount: 250, status: "cleared",
+    });
+  });
+
   it("returns amounts and timestamps as numbers, not text", async () => {
     await upsertCheque(sql, cheque({ id: "n-1", amount: 100.5, createdAt: 1759449600000 }));
     await upsertCheque(sql, cheque({ id: "n-2", amount: null }));

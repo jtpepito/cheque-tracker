@@ -1,10 +1,14 @@
 import { Pool, type PoolClient } from "pg";
+import { pgConfig } from "./pg-config";
 import type { Sql } from "./sql";
 
 /** Postgres over the network (Supabase's transaction pooler). */
-export function pgSql(url: string): Sql {
-  // Supabase's pooler certificate is not in Node's default trust store.
-  const pool = new Pool({ connectionString: url, max: 3, idleTimeoutMillis: 10_000, ssl: { rejectUnauthorized: false } });
+export function pgSql(url: string, caCert: string | undefined = process.env.DATABASE_CA_CERT): Sql {
+  const pool = new Pool(pgConfig(url, caCert));
+  // An idle connection can be dropped while a serverless function is frozen. Without a listener
+  // that error would crash the process; the pool simply opens a new connection next time.
+  pool.on("error", (err) => console.error("[db] idle connection error:", err.message));
+
   const on = (run: Pool | PoolClient, tx: Sql["tx"]): Sql => ({
     query: async <T>(text: string, params?: unknown[]) => (await run.query(text, params)).rows as T[],
     exec: async (text: string) => {

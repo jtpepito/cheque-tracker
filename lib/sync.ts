@@ -89,6 +89,8 @@ export async function applySync(sql: Sql, payload: SyncPayload, now: number = Da
 
   try {
     return await sql.tx(async (t) => {
+      // One sync at a time: a second one waits here until the first has finished.
+      await t.query("SELECT pg_advisory_xact_lock(7234501)");
       const existing = new Map((await listCheques(t)).map((c) => [c.id, c]));
       const report: SyncReport = {
         at: now,

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { clearFailures, isBlocked, MAX_FAILURES, recordFailure, WINDOW_MS } from "@/lib/login-throttle";
+import { allowAttempt, clearAttempts, MAX_FAILURES, WINDOW_MS } from "@/lib/login-throttle";
 import type { Sql } from "@/lib/sql";
 import { resetDb, testSql } from "./db";
 
@@ -9,34 +9,38 @@ beforeEach(async () => {
   await resetDb(sql);
 });
 
-const failTimes = async (who: string, times: number, at: number) => {
-  for (let i = 0; i < times; i++) await recordFailure(sql, who, at + i);
+const attempts = async (who: string, times: number, at: number) => {
+  const results: boolean[] = [];
+  for (let i = 0; i < times; i++) results.push(await allowAttempt(sql, who, at + i));
+  return results;
 };
 
 describe("sign-in lockout", () => {
-  it("blocks an address after ten wrong passwords inside the window, and only that address", async () => {
-    await failTimes("1.1.1.1", MAX_FAILURES - 1, 1000);
-    expect(await isBlocked(sql, "1.1.1.1", 2000)).toBe(false);
-    await recordFailure(sql, "1.1.1.1", 2000);
-    expect(await isBlocked(sql, "1.1.1.1", 3000)).toBe(true);
-    expect(await isBlocked(sql, "2.2.2.2", 3000)).toBe(false);
+  it("allows ten attempts from an address inside the window and refuses the eleventh", async () => {
+    expect(await attempts("1.1.1.1", MAX_FAILURES, 1000)).toEqual(Array(MAX_FAILURES).fill(true));
+    expect(await allowAttempt(sql, "1.1.1.1", 2000)).toBe(false);
+    expect(await allowAttempt(sql, "2.2.2.2", 2000)).toBe(true);
+  });
+
+  it("counts attempts made at the same moment, so a burst cannot slip past", async () => {
+    const burst = await Promise.all(Array.from({ length: MAX_FAILURES + 5 }, () => allowAttempt(sql, "1.1.1.1", 1000)));
+    expect(burst.filter(Boolean)).toHaveLength(MAX_FAILURES);
   });
 
   it("lets the address try again once the window has passed", async () => {
-    await failTimes("1.1.1.1", MAX_FAILURES, 1000);
-    expect(await isBlocked(sql, "1.1.1.1", 1000 + WINDOW_MS - 1)).toBe(true);
-    expect(await isBlocked(sql, "1.1.1.1", 1000 + MAX_FAILURES + WINDOW_MS)).toBe(false);
+    await attempts("1.1.1.1", MAX_FAILURES, 1000);
+    expect(await allowAttempt(sql, "1.1.1.1", 1000 + MAX_FAILURES + WINDOW_MS + 1)).toBe(true);
   });
 
-  it("forgets failures after a correct password", async () => {
-    await failTimes("1.1.1.1", MAX_FAILURES, 1000);
-    await clearFailures(sql, "1.1.1.1");
-    expect(await isBlocked(sql, "1.1.1.1", 2000)).toBe(false);
+  it("forgets the attempts after a correct password", async () => {
+    await attempts("1.1.1.1", MAX_FAILURES, 1000);
+    await clearAttempts(sql, "1.1.1.1");
+    expect(await allowAttempt(sql, "1.1.1.1", 2000)).toBe(true);
   });
 
-  it("clears out old failures as new ones are recorded", async () => {
-    await failTimes("1.1.1.1", 3, 1000);
-    await recordFailure(sql, "2.2.2.2", 1000 + WINDOW_MS + 5000);
+  it("clears out old attempts as new ones are recorded", async () => {
+    await attempts("1.1.1.1", 3, 1000);
+    await allowAttempt(sql, "2.2.2.2", 1000 + WINDOW_MS + 5000);
     expect(await sql.query("SELECT 1 FROM login_failures WHERE who = $1", ["1.1.1.1"])).toEqual([]);
   });
 });
