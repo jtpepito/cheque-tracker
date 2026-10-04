@@ -6,7 +6,7 @@ import type { SyncReport } from "@/lib/sync";
 const AT = Date.UTC(2026, 9, 3, 6, 15);
 const MIN = 60_000;
 const report = (over: Partial<SyncReport> = {}): SyncReport => ({
-  at: AT, dryRun: false, rows: 587, added: 0, changed: 0, removed: 0, unchanged: 587, problems: [], ...over,
+  at: AT, dryRun: false, rows: 587, added: 0, changed: 0, removed: 0, unchanged: 587, problems: [], changes: [], ...over,
 });
 
 describe("syncLine", () => {

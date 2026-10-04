@@ -3,7 +3,7 @@ import type { Sql } from "@/lib/sql";
 import { resetDb, testSql } from "./db";
 import { listCheques, setCompany, upsertCheque } from "@/lib/cheques";
 import type { SheetRow } from "@/lib/sheet-rows";
-import { applySync, getLastRefusal, getLastSync, parsePayload, recordRefusal, SyncRefused, type SyncPayload } from "@/lib/sync";
+import { applySync, getLastCheck, getLastRefusal, getLastSync, parsePayload, recordRefusal, SyncRefused, type SyncPayload } from "@/lib/sync";
 import { cheque } from "./helpers";
 
 const sheetRow = (n: number, over: SheetRow = {}): SheetRow => ({
@@ -38,7 +38,7 @@ const byId = async (id: string) => (await listCheques(sql)).find((c) => c.id ===
 describe("applySync", () => {
   it("adds new cheques from the sheet", async () => {
     const report = await applySync(sql, payload([sheetRow(2), sheetRow(3)]), 1000);
-    expect(report).toEqual({ at: 1000, dryRun: false, rows: 2, added: 2, changed: 0, removed: 0, unchanged: 0, problems: [] });
+    expect(report).toEqual({ at: 1000, dryRun: false, rows: 2, added: 2, changed: 0, removed: 0, unchanged: 0, problems: [], changes: [] });
     expect((await byId("imp-2"))).toMatchObject({
       payee: "Sample Supplier", chequeNo: "590002", amount: 100, issueDate: "2026-10-05", encodedDate: "2026-09-28",
       status: "issued", company: "unassigned", companyBasis: "none", imported: true, sourceRow: 2, createdAt: 1000,
@@ -178,5 +178,32 @@ describe("refusals", () => {
     expect((await getLastRefusal(sql))).not.toBeNull();
     await applySync(sql, payload([sheetRow(2)]), 6000);
     expect((await getLastRefusal(sql))).toBeNull();
+  });
+});
+
+describe("what changed", () => {
+  it("lists each changed row with the fields that differ, and from-to for status and company", async () => {
+    await applySync(sql, payload([sheetRow(2), sheetRow(3), sheetRow(4)]));
+    const report = await applySync(
+      sql,
+      payload(
+        [sheetRow(2, { status: "Cleared", amount: 250 }), sheetRow(3), sheetRow(4, { row: 9, chequeDate: "2026-10-06" })],
+        { siRefs: { wythlae: "CBC 590003 100.00" } },
+      ),
+    );
+    expect(report.changes).toEqual([
+      { row: 2, id: "imp-2", fields: ["amount", "status: issued → cleared"] },
+      { row: 3, id: "imp-3", fields: ["company: unassigned → wythlae"] },
+      { row: 9, id: "imp-4", fields: ["cheque date"] },
+    ]);
+  });
+
+  it("keeps the last check so its details can be looked at afterwards, without touching the last real sync", async () => {
+    await applySync(sql, payload([sheetRow(2)]), 1000);
+    expect(await getLastCheck(sql)).toBeNull();
+    await applySync(sql, payload([sheetRow(2, { status: "Cleared" })], { dryRun: true }), 2000);
+    expect(await getLastCheck(sql)).toMatchObject({ at: 2000, dryRun: true, changed: 1, changes: [{ id: "imp-2" }] });
+    expect((await getLastSync(sql))!.at).toBe(1000);
+    expect((await byId("imp-2"))!.status).toBe("issued");
   });
 });

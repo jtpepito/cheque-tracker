@@ -19,7 +19,29 @@ export type SyncReport = {
   removed: number;
   unchanged: number;
   problems: RowProblem[];
+  /** Which known cheques changed and how, so a check can be judged before it is applied. */
+  changes: RowChange[];
 };
+
+export type RowChange = { row: number; id: string; fields: string[] };
+
+/** A report lists at most this many changed rows; the counts are always complete. */
+const MAX_LISTED_CHANGES = 300;
+
+/** What differs between the stored cheque and the sheet's row, in words. */
+function changedFields(old: Cheque, next: Cheque): string[] {
+  const fields: string[] = [];
+  if (old.company !== next.company) fields.push(`company: ${old.company} → ${next.company}`);
+  else if (old.companyBasis !== next.companyBasis) fields.push("company basis");
+  if (old.chequeNo !== next.chequeNo) fields.push("cheque no.");
+  if (old.payee !== next.payee) fields.push("supplier");
+  if (old.amount !== next.amount) fields.push("amount");
+  if (old.issueDate !== next.issueDate) fields.push("cheque date");
+  if (old.encodedDate !== next.encodedDate) fields.push("date logged");
+  if (old.particulars !== next.particulars) fields.push("reference");
+  if (old.status !== next.status) fields.push(`status: ${old.status} → ${next.status}`);
+  return fields;
+}
 
 /** A sync the app will not apply. Nothing was changed. */
 export class SyncRefused extends Error {
@@ -101,6 +123,7 @@ export async function applySync(sql: Sql, payload: SyncPayload, now: number = Da
         removed: 0,
         unchanged: 0,
         problems,
+        changes: [],
       };
 
       for (const r of good.values()) {
@@ -125,7 +148,12 @@ export async function applySync(sql: Sql, payload: SyncPayload, now: number = Da
         };
         if (!old) report.added += 1;
         else if (sameContent(old, next)) report.unchanged += 1;
-        else report.changed += 1;
+        else {
+          report.changed += 1;
+          if (report.changes.length < MAX_LISTED_CHANGES) {
+            report.changes.push({ row: r.row, id: r.id, fields: changedFields(old, next) });
+          }
+        }
         if (!old || !sameContent(old, next) || old.sourceRow !== next.sourceRow || !old.imported) await upsertCheque(t, next);
       }
 
@@ -146,9 +174,17 @@ export async function applySync(sql: Sql, payload: SyncPayload, now: number = Da
       return report;
     });
   } catch (err) {
-    if (err instanceof DryRunDone) return err.report;
+    if (err instanceof DryRunDone) {
+      // The check itself was rolled back; only its report is kept, to be looked at afterwards.
+      await setConfig(sql, "last_check", JSON.stringify(err.report));
+      return err.report;
+    }
     throw err;
   }
+}
+
+export function getLastCheck(sql: Sql): Promise<SyncReport | null> {
+  return getConfigJson<SyncReport>(sql, "last_check");
 }
 
 export type SyncRefusal = { at: number; message: string };
