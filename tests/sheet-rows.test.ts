@@ -32,6 +32,8 @@ describe("statusFromSheet", () => {
   it("maps the sheet's words, ignoring case and spaces", () => {
     expect(statusFromSheet("Cleared")).toBe("cleared");
     expect(statusFromSheet(" encashed ")).toBe("cleared");
+    expect(statusFromSheet("for encashed")).toBe("cleared");
+    expect(statusFromSheet("For  Encashed ")).toBe("cleared");
     expect(statusFromSheet("Released to Supplier")).toBe("issued");
     expect(statusFromSheet("Cancelled")).toBe("voided");
     expect(statusFromSheet("RETURNED")).toBe("voided");

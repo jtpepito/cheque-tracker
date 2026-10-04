@@ -87,7 +87,7 @@ Kept thin: read, fill IDs, send. Every rule about what a row means lives in the 
 | Date logged | Same formats; blank or unreadable becomes none. |
 | Amount | A number, or text like `₱16,882.63`. Blank is kept as no amount. Negative or unreadable is a problem row. |
 | Cheque number | Text as shown; a trailing `.0` on an all-digit number is dropped. May be blank. |
-| Status | Cleared / Encashed → `cleared`; Released to Supplier → `issued`; Cancelled / Returned / Replaced → `voided`; With Christine → `pending`; anything else, including blank → `issued`. Case and surrounding spaces are ignored. |
+| Status | Cleared / Encashed / For encashed → `cleared`; Released to Supplier → `issued`; Cancelled / Returned / Replaced → `voided`; With Christine → `pending`; anything else, including blank → `issued`. Case and surrounding spaces are ignored. |
 | Supplier, reference | Text, trimmed. |
 
 ### 5.3 Company

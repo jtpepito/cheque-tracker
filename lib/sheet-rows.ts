@@ -46,8 +46,9 @@ export function parseSheetDate(raw: unknown): string | null {
 }
 
 export function statusFromSheet(raw: unknown): Status {
-  const s = text(raw).toLowerCase();
-  if (s === "cleared" || s === "encashed") return "cleared";
+  const s = text(raw).toLowerCase().replace(/\s+/g, " ");
+  // "for encashed" counts as settled: the owner confirmed the cash has already been withdrawn.
+  if (s === "cleared" || s === "encashed" || s === "for encashed") return "cleared";
   if (s === "cancelled" || s === "returned" || s === "replaced") return "voided";
   if (s === "with christine") return "pending";
   return "issued";
