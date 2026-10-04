@@ -27,9 +27,8 @@ Real payees and amounts stay out of git: `data/` is ignored.
 Live at https://cheque-tracker-nine.vercel.app. Data lives in the Supabase project `cheque-tracker`
 (Singapore); the site runs on Vercel (project `cheque-tracker`, team `wwj10`, region `sin1`).
 
-Deploying is manual for now: `npx.cmd vercel deploy --prod --scope wwj10` from this folder, signed in to
-Vercel. To deploy on every push instead, connect the GitHub repo under the Vercel project's Settings > Git
-(Vercel's GitHub app needs access to `jtpepito/cheque-tracker` first).
+A push to `main` on GitHub deploys to production (the repo is connected to the Vercel project). Run
+`npm.cmd run migrate` first when a change adds a file to `db/migrations`.
 
 `DATABASE_URL` must use Supabase's **shared pooler** host (`aws-0-ap-southeast-1.pooler.supabase.com`, user
 `postgres.<project ref>`). The `db.<ref>.supabase.co` host is IPv6-only and Vercel cannot reach it.
@@ -49,7 +48,7 @@ companies chosen by hand, and prints the count and totals by company. Backups ar
 The app refuses to run in production without `DATABASE_URL`, so it can never keep data somewhere
 that resets.
 
-Optional but recommended: `DATABASE_CA_CERT`, the text of Supabase's CA certificate (Supabase dashboard >
+Set since 4 Oct 2026: `DATABASE_CA_CERT`, the text of Supabase's CA certificate (Supabase dashboard >
 Database settings > SSL configuration > download certificate). With it, the app verifies it is really
 talking to Supabase. Without it, the connection is encrypted but the server is not verified. Set it in
 Vercel, and in `.env.production.local` with line breaks written as `\n`.
