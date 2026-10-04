@@ -29,7 +29,7 @@ export type RowChange = { row: number; id: string; fields: string[] };
 const MAX_LISTED_CHANGES = 300;
 
 /** What differs between the stored cheque and the sheet's row, in words. */
-function changedFields(old: Cheque, next: Cheque): string[] {
+function changedFields(old: Cheque, next: Cheque, statusText: string): string[] {
   const fields: string[] = [];
   if (old.company !== next.company) fields.push(`company: ${old.company} → ${next.company}`);
   else if (old.companyBasis !== next.companyBasis) fields.push("company basis");
@@ -39,7 +39,7 @@ function changedFields(old: Cheque, next: Cheque): string[] {
   if (old.issueDate !== next.issueDate) fields.push("cheque date");
   if (old.encodedDate !== next.encodedDate) fields.push("date logged");
   if (old.particulars !== next.particulars) fields.push("reference");
-  if (old.status !== next.status) fields.push(`status: ${old.status} → ${next.status}`);
+  if (old.status !== next.status) fields.push(`status: ${old.status} → ${next.status} (sheet says "${statusText}")`);
   return fields;
 }
 
@@ -151,7 +151,7 @@ export async function applySync(sql: Sql, payload: SyncPayload, now: number = Da
         else {
           report.changed += 1;
           if (report.changes.length < MAX_LISTED_CHANGES) {
-            report.changes.push({ row: r.row, id: r.id, fields: changedFields(old, next) });
+            report.changes.push({ row: r.row, id: r.id, fields: changedFields(old, next, r.statusText) });
           }
         }
         if (!old || !sameContent(old, next) || old.sourceRow !== next.sourceRow || !old.imported) await upsertCheque(t, next);

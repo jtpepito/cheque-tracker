@@ -59,6 +59,7 @@ describe("readRow", () => {
         encodedDate: "2026-09-28",
         particulars: "SI 1",
         status: "issued",
+        statusText: "Released to Supplier",
       },
     });
   });

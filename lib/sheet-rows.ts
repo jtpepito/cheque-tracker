@@ -26,6 +26,8 @@ export type ReadRow = {
   encodedDate: string | null;
   particulars: string;
   status: Status;
+  /** The status cell exactly as typed in the sheet, for explaining a status change. */
+  statusText: string;
 };
 
 export type RowProblem = { row: number; id: string; reason: string };
@@ -91,6 +93,7 @@ export function readRow(
       encodedDate: parseSheetDate(raw.date),
       particulars: text(raw.reference),
       status: statusFromSheet(raw.status),
+      statusText: text(raw.status),
     },
   };
 }

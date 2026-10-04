@@ -192,7 +192,7 @@ describe("what changed", () => {
       ),
     );
     expect(report.changes).toEqual([
-      { row: 2, id: "imp-2", fields: ["amount", "status: issued → cleared"] },
+      { row: 2, id: "imp-2", fields: ["amount", 'status: issued → cleared (sheet says "Cleared")'] },
       { row: 3, id: "imp-3", fields: ["company: unassigned → wythlae"] },
       { row: 9, id: "imp-4", fields: ["cheque date"] },
     ]);
