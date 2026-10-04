@@ -24,8 +24,15 @@ Real payees and amounts stay out of git: `data/` is ignored.
 
 ## Production: Vercel + Supabase
 
-Data lives in the Supabase project `cheque-tracker` (Singapore); the site runs on Vercel
-(project `cheque-tracker`, team `wwj10`, region `sin1`).
+Live at https://cheque-tracker-nine.vercel.app. Data lives in the Supabase project `cheque-tracker`
+(Singapore); the site runs on Vercel (project `cheque-tracker`, team `wwj10`, region `sin1`).
+
+Deploying is manual for now: `npx.cmd vercel deploy --prod --scope wwj10` from this folder, signed in to
+Vercel. To deploy on every push instead, connect the GitHub repo under the Vercel project's Settings > Git
+(Vercel's GitHub app needs access to `jtpepito/cheque-tracker` first).
+
+`DATABASE_URL` must use Supabase's **shared pooler** host (`aws-0-ap-southeast-1.pooler.supabase.com`, user
+`postgres.<project ref>`). The `db.<ref>.supabase.co` host is IPv6-only and Vercel cannot reach it.
 
 Secrets are set in Vercel (Production): `ADMIN_PASSWORD`, `SESSION_SECRET`, `SYNC_KEY`, `DATABASE_URL`.
 `DATABASE_URL` is the Supabase **transaction pooler** string (port 6543). For the two commands below it
