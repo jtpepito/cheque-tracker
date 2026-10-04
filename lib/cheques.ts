@@ -1,5 +1,6 @@
 import "server-only";
 import type { Holiday } from "./banking";
+import type { Balance, Trading } from "./projection";
 import type { Sql } from "./sql";
 import { DEFAULT_COMPANY_NAMES, type Cheque, type Company, type CompanyNames, type Status } from "./types";
 
@@ -124,4 +125,19 @@ export async function addHoliday(sql: Sql, h: Holiday): Promise<Holiday> {
 
 export async function removeHoliday(sql: Sql, date: string): Promise<void> {
   await sql.query("DELETE FROM holidays WHERE date = $1", [date]);
+}
+
+/** Each trading company's bank balance as last typed in, with when. */
+export async function listBalances(sql: Sql): Promise<Balance[]> {
+  const rows = await sql.query<Row>("SELECT company, amount, updated_at FROM balances ORDER BY company");
+  return rows.map((r) => ({ company: r.company as Trading, amount: Number(r.amount), updatedAt: Number(r.updated_at) }));
+}
+
+export async function setBalance(sql: Sql, company: Trading, amount: number, now: number = Date.now()): Promise<Balance> {
+  await sql.query(
+    `INSERT INTO balances (company, amount, updated_at) VALUES ($1, $2, $3)
+     ON CONFLICT (company) DO UPDATE SET amount = excluded.amount, updated_at = excluded.updated_at`,
+    [company, amount, now],
+  );
+  return { company, amount, updatedAt: now };
 }

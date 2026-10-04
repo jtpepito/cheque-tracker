@@ -149,3 +149,14 @@ This replaces "by cheque date" in §5.2: the calendar counts each issued cheque 
 - **Register:** the cheque date column and the sort are unchanged. A pending or issued cheque whose clearing day differs shows "Clears Mon, 5 Oct" under its date.
 - **Holidays:** a `holidays` table (`date`, `name`), seeded once with the 2026 national holidays. The page's "Bank holidays" section lets anyone signed in add or remove a day; the list is shared. Local holidays, Eid holidays and later years are added there.
 - **Routes:** `POST /api/holidays`, `DELETE /api/holidays/:date`; `/api/state` also returns `holidays`.
+
+## 12. Bank balances and shortfall warnings (added 4 Oct 2026)
+
+- **Balances:** one per trading company, typed in on the page ("Bank balances"), saved with the time entered, shared by everyone. Zero and overdrawn figures are allowed. A balance more than 3 days old is marked stale. Stored in a `balances` table; `PUT /api/balances`.
+- **Projection:** for each company, the entered balance minus its issued cheques as they clear (banking-day rule), for the 14 days shown. Each calendar card shows, under a company's amount, what is left or how much it is short.
+- **Shortfall:** the first day a company's expected balance is below zero is flagged in red on the card and named in a "Not enough in the bank" alert with the amount short. Exactly zero is covered.
+- **Overdue cheques:** cheques still issued from before today, or with no date, come off today's balance, because they can still be presented. They are listed per company as "Earlier, not yet cleared".
+- **Unassigned cheques** are not counted against any account; their total is shown as a warning.
+- **No balance entered:** that company is not checked, and the page says so.
+- **Not modelled:** deposits and other money coming in, bank charges, transfers, and more than one account per company. The projection is a worst case.
+- **Rule for staff:** enter the balance the bank shows now, and mark cheques Cleared in the sheet once paid, or they are taken off twice.

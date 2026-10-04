@@ -4,7 +4,7 @@ import type { SyncRefusal, SyncReport } from "./sync";
 export const STALE_MS = 90 * 60 * 1000;
 
 /** "3 Oct, 2:15 PM" in Manila. Built from parts so the spacing does not vary between systems. */
-function manilaTime(at: number): string {
+export function manilaTime(at: number): string {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "Asia/Manila",
     day: "numeric",

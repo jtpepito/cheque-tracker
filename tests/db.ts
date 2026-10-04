@@ -15,6 +15,6 @@ export function testSql(): Promise<Sql> {
 }
 
 export async function resetDb(sql: Sql): Promise<void> {
-  await sql.exec("TRUNCATE cheques, config, holidays, login_failures");
+  await sql.exec("TRUNCATE cheques, config, holidays, login_failures, balances");
   await seedHolidays(sql);
 }

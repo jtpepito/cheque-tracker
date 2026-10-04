@@ -5,8 +5,10 @@ import { api, ApiError } from "@/lib/api";
 import type { Holiday } from "@/lib/banking";
 import { buildCalendar } from "@/lib/calendar";
 import { latestOnly } from "@/lib/latest";
+import { buildProjection, type Balance } from "@/lib/projection";
 import type { SyncRefusal, SyncReport } from "@/lib/sync";
 import type { Cheque, CompanyNames } from "@/lib/types";
+import { Balances } from "./balances";
 import { FundingCalendar } from "./funding-calendar";
 import { Header } from "./header";
 import { Holidays } from "./holidays";
@@ -20,6 +22,7 @@ type State = {
   holidays: Holiday[];
   sync: SyncReport | null;
   refusal: SyncRefusal | null;
+  balances: Balance[];
   cheques: Cheque[];
 };
 
@@ -58,6 +61,8 @@ export function Tracker() {
     );
   }
 
+  const projection = buildProjection(state.cheques, state.balances, state.today, state.holidays, state.now);
+
   return (
     <main className="mx-auto max-w-6xl space-y-8 p-4 sm:p-6">
       <Header names={state.companies} onChanged={refresh} />
@@ -67,7 +72,12 @@ export function Tracker() {
         </p>
       )}
       <SyncStatus sync={state.sync} refusal={state.refusal} now={state.now} />
-      <FundingCalendar days={buildCalendar(state.cheques, state.today, state.holidays)} names={state.companies} />
+      <FundingCalendar
+        days={buildCalendar(state.cheques, state.today, state.holidays)}
+        projection={projection}
+        names={state.companies}
+      />
+      <Balances projection={projection} names={state.companies} onChanged={refresh} />
       <Register cheques={state.cheques} names={state.companies} holidays={state.holidays} onChanged={refresh} />
       <Holidays holidays={state.holidays} today={state.today} onChanged={refresh} />
     </main>
