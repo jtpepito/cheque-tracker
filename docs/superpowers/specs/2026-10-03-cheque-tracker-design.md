@@ -160,3 +160,14 @@ This replaces "by cheque date" in §5.2: the calendar counts each issued cheque 
 - **No balance entered:** that company is not checked, and the page says so.
 - **Not modelled:** deposits and other money coming in, bank charges, transfers, and more than one account per company. The projection is a worst case.
 - **Rule for staff:** enter the balance the bank shows now, and mark cheques Cleared in the sheet once paid, or they are taken off twice.
+
+### 12.1 Changes after review (4 Oct 2026)
+
+A wrong "covered" costs a bounced cheque and a wrong "short" costs a look at the bank, so the feature errs towards warning.
+
+- **Cheques marked cleared after the balance was entered are taken off too.** Once cleared, a cheque leaves the projection, but the balance typed in earlier may still include its money. The tracker stamps each cheque when its status changes (`cheques.status_changed_at`) and subtracts cleared cheques stamped after the balance's entry time. Entering the balance again resets this.
+- **"Covered" is only said when it has been checked:** never on a balance more than 3 days old, and it always states when each balance was entered.
+- **The alert gives the deepest shortfall in the 14 days** as well as the first, so the amount to move is not understated, and says when the shortfall counts earlier cheques or cheques cleared since the balance was entered.
+- **The card for the first short day always shows the company and the amount short,** even when none of its cheques clears that day (a weekend, or short from earlier cheques).
+- The message wording lives in `lib/funding-messages.ts` and is tested.
+- Deploy order: run `npm.cmd run migrate` against production before pushing, because the page now reads the new table and column.

@@ -33,6 +33,7 @@ function toCheque(r: Row): Cheque {
     companyBasis: (r.company_basis as string | null) ?? null,
     sourceRow: r.source_row == null ? null : Number(r.source_row),
     companyLocked: r.company_locked === true,
+    statusChangedAt: r.status_changed_at == null ? null : Number(r.status_changed_at),
   };
 }
 
@@ -48,8 +49,9 @@ export async function listCheques(sql: Sql): Promise<Cheque[]> {
 export async function upsertCheque(sql: Sql, c: Cheque): Promise<void> {
   await sql.query(
     `INSERT INTO cheques (id, company, cheque_no, payee, amount, issue_date, encoded_date, bank_account,
-                          particulars, status, created_at, imported, company_basis, source_row, company_locked)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+                          particulars, status, created_at, imported, company_basis, source_row, company_locked,
+                          status_changed_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
      ON CONFLICT (id) DO UPDATE SET
        company = CASE WHEN cheques.company_locked THEN cheques.company ELSE excluded.company END,
        cheque_no = excluded.cheque_no, payee = excluded.payee,
@@ -58,10 +60,12 @@ export async function upsertCheque(sql: Sql, c: Cheque): Promise<void> {
        created_at = excluded.created_at, imported = excluded.imported,
        company_basis = CASE WHEN cheques.company_locked THEN cheques.company_basis ELSE excluded.company_basis END,
        source_row = excluded.source_row,
-       company_locked = cheques.company_locked OR excluded.company_locked`,
+       company_locked = cheques.company_locked OR excluded.company_locked,
+       status_changed_at = excluded.status_changed_at`,
     [
       c.id, c.company, c.chequeNo, c.payee, c.amount, c.issueDate, c.encodedDate, c.bankAccount,
       c.particulars, c.status, c.createdAt, c.imported, c.companyBasis, c.sourceRow, c.companyLocked,
+      c.statusChangedAt,
     ],
   );
 }

@@ -51,3 +51,13 @@ describe("balances store", () => {
     expect(await listBalances(sql)).toEqual([]);
   });
 });
+
+describe("parseBalance edge cases", () => {
+  it("reads back a negative figure the way the page displays it", () => {
+    expect(parseBalance("−₱250.50")).toBe(-250.5);
+  });
+  it("rejects a figure that only reaches the limit after rounding", () => {
+    expect(parseBalance(999999999999.999)).toBeNull();
+    expect(parseBalance("999,999,999,999.99")).toBe(999999999999.99);
+  });
+});

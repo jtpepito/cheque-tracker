@@ -20,6 +20,7 @@ export function cheque(over: Partial<Cheque> = {}): Cheque {
     companyBasis: null,
     sourceRow: null,
     companyLocked: false,
+    statusChangedAt: null,
     ...over,
   };
 }

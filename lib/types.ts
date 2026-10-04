@@ -24,6 +24,8 @@ export type Cheque = {
   sourceRow: number | null;
   /** True once someone chose the company by hand; a sheet sync then never changes it. */
   companyLocked: boolean;
+  /** When the tracker last saw this cheque's status change (epoch ms); null if never seen changing. */
+  statusChangedAt: number | null;
 };
 
 export type CompanyNames = Record<Exclude<Company, "unassigned">, string>;

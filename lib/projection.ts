@@ -3,8 +3,9 @@ import { addDays } from "./dates";
 import type { Cheque, Company } from "./types";
 
 // Will each company's bank account cover its cheques? Starting from the balance someone typed in,
-// take off every cheque still marked issued as it clears. It is a worst case: money coming in is
-// not known here, and neither are bank charges or transfers.
+// take off every cheque still marked issued as it clears. It errs on the side of warning: a false
+// "short" costs a look at the bank, a false "covered" costs a bounced cheque.
+// Money coming in is not known here, and neither are bank charges or transfers.
 
 export type Trading = Exclude<Company, "unassigned">;
 export const TRADING: readonly Trading[] = ["wwj", "wythlae", "wwjcorp"];
@@ -22,6 +23,8 @@ export type DayProjection = {
   end: number | null;
 };
 
+export type Shortfall = { date: string; shortBy: number };
+
 export type CompanyProjection = {
   company: Trading;
   balance: number | null;
@@ -29,9 +32,16 @@ export type CompanyProjection = {
   stale: boolean;
   /** Still issued from before today (or with no date): they can be presented any day, so they come off today's balance. */
   overdue: number;
+  /**
+   * Marked cleared after the balance was entered. Once cleared a cheque leaves the list above, but the
+   * balance typed in earlier may still include its money, so it is taken off as well.
+   */
+  clearedSince: number;
   days: DayProjection[];
   /** The first day the expected balance is below zero. */
-  firstShortfall: { date: string; shortBy: number } | null;
+  firstShortfall: Shortfall | null;
+  /** The deepest the expected balance goes below zero in the days shown: how much to move in all. */
+  lowest: Shortfall | null;
 };
 
 export type Projection = {
@@ -41,6 +51,7 @@ export type Projection = {
 };
 
 const centavos = (amount: number | null) => Math.round((amount ?? 0) * 100);
+const sum = (list: Array<{ centavos: number }>) => list.reduce((total, c) => total + c.centavos, 0);
 
 export function buildProjection(
   cheques: Cheque[],
@@ -60,16 +71,35 @@ export function buildProjection(
   const companies = TRADING.map((company): CompanyProjection => {
     const mine = issued.filter((c) => c.company === company);
     const balance = balances.find((b) => b.company === company) ?? null;
-    const overdue = mine.filter((c) => isOverdue(c.clears)).reduce((sum, c) => sum + c.centavos, 0);
+    const overdue = sum(mine.filter((c) => isOverdue(c.clears)));
+    const clearedSince =
+      balance === null
+        ? 0
+        : sum(
+            cheques
+              .filter(
+                (c) =>
+                  c.company === company &&
+                  c.status === "cleared" &&
+                  c.statusChangedAt !== null &&
+                  c.statusChangedAt > balance.updatedAt,
+              )
+              .map((c) => ({ centavos: centavos(c.amount) })),
+          );
 
-    let running = balance === null ? null : centavos(balance.amount) - overdue;
-    let firstShortfall: CompanyProjection["firstShortfall"] = null;
+    let running = balance === null ? null : centavos(balance.amount) - overdue - clearedSince;
+    let firstShortfall: Shortfall | null = null;
+    let lowest: Shortfall | null = null;
     const dayList = Array.from({ length: days }, (_, i): DayProjection => {
       const date = addDays(today, i);
-      const out = mine.filter((c) => c.clears === date).reduce((sum, c) => sum + c.centavos, 0);
+      const out = sum(mine.filter((c) => c.clears === date));
       if (running !== null) {
         running -= out;
-        if (running < 0 && !firstShortfall) firstShortfall = { date, shortBy: -running / 100 };
+        if (running < 0) {
+          const shortBy = -running / 100;
+          if (!firstShortfall) firstShortfall = { date, shortBy };
+          if (!lowest || shortBy > lowest.shortBy) lowest = { date, shortBy };
+        }
       }
       return { date, out: out / 100, end: running === null ? null : running / 100 };
     });
@@ -80,8 +110,10 @@ export function buildProjection(
       updatedAt: balance?.updatedAt ?? null,
       stale: balance !== null && now - balance.updatedAt > STALE_BALANCE_MS,
       overdue: overdue / 100,
+      clearedSince: clearedSince / 100,
       days: dayList,
       firstShortfall,
+      lowest,
     };
   });
 
@@ -89,8 +121,8 @@ export function buildProjection(
   return {
     companies,
     unassigned: {
-      overdue: loose.filter((c) => isOverdue(c.clears)).reduce((sum, c) => sum + c.centavos, 0) / 100,
-      upcoming: loose.filter((c) => !isOverdue(c.clears) && c.clears <= lastDay).reduce((sum, c) => sum + c.centavos, 0) / 100,
+      overdue: sum(loose.filter((c) => isOverdue(c.clears))) / 100,
+      upcoming: sum(loose.filter((c) => !isOverdue(c.clears) && c.clears <= lastDay)) / 100,
     },
   };
 }

@@ -33,7 +33,7 @@ describe("importCheques", () => {
   it("loads rows with every field", async () => {
     const r = await importCheques(sql, { cheques: [row()] });
     expect(r.count).toBe(1);
-    expect((await listCheques(sql))[0]).toEqual({ ...row(), companyLocked: false });
+    expect((await listCheques(sql))[0]).toEqual({ ...row(), companyLocked: false, statusChangedAt: null });
   });
 
   it("can be run twice without duplicating rows, and the file wins", async () => {

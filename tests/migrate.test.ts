@@ -6,7 +6,7 @@ import { pgliteSql } from "@/lib/sql-pglite";
 describe("migrate", () => {
   it("creates every table, seeds the holidays once, and does nothing the second time", async () => {
     const sql = await pgliteSql();
-    expect(await migrate(sql)).toEqual(["001_init.sql", "002_balances.sql"]);
+    expect(await migrate(sql)).toEqual(["001_init.sql", "002_balances.sql", "003_status_changed_at.sql"]);
     const tables = await sql.query<{ table_name: string }>(
       "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name",
     );

@@ -49,12 +49,18 @@ function BalanceRow({ c, names, onChanged }: { c: CompanyProjection; names: Comp
           because these cheques can still be presented.
         </p>
       )}
+      {c.clearedSince > 0 && (
+        <p className="text-muted">
+          Marked cleared since this balance was entered: <span className="font-mono">{peso(c.clearedSince)}</span>. Taken
+          off as well, in case the bank paid them after you looked. Enter the balance again to reset this.
+        </p>
+      )}
       <form onSubmit={save} className="flex flex-wrap items-end gap-2">
         <label className="space-y-1">
           <span className="block text-muted">Balance at the bank now (₱)</span>
           <input
             className="field"
-            inputMode="decimal"
+            inputMode="text"
             required
             placeholder="0.00"
             value={amount}
@@ -92,9 +98,10 @@ export function Balances({
         Bank balances
       </h2>
       <p className="text-muted">
-        Enter each account&apos;s balance as the bank shows it now. The calendar then takes off every cheque still marked
-        issued. It does not know about deposits or other money coming in, so the real balance may be better than shown.
-        Mark cheques Cleared in the sheet once the bank has paid them, or they are taken off twice.
+        Enter each account&apos;s balance as the bank shows it now, and again whenever you check the bank. The calendar
+        takes off every cheque still marked issued, and any marked cleared after you entered the balance. It does not
+        know about deposits, bank charges or transfers, so check the bank before relying on it. An overdrawn account
+        can be entered with a minus sign.
       </p>
       <ul className="grid gap-2 lg:grid-cols-3">
         {projection.companies.map((c) => (

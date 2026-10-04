@@ -145,6 +145,8 @@ export async function applySync(sql: Sql, payload: SyncPayload, now: number = Da
           companyBasis: old?.companyLocked ? old.companyBasis : derived.basis,
           sourceRow: r.row,
           companyLocked: old?.companyLocked ?? false,
+          // A cheque first seen, or seen with a new status, is stamped now.
+          statusChangedAt: !old || old.status !== r.status ? now : old.statusChangedAt,
         };
         if (!old) report.added += 1;
         else if (sameContent(old, next)) report.unchanged += 1;

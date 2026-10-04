@@ -207,3 +207,15 @@ describe("what changed", () => {
     expect((await byId("imp-2"))!.status).toBe("issued");
   });
 });
+
+describe("when a status changed", () => {
+  it("stamps a new cheque and a cheque whose status changes, and leaves the stamp alone otherwise", async () => {
+    await applySync(sql, payload([sheetRow(2), sheetRow(3)]), 1000);
+    expect((await byId("imp-2"))!.statusChangedAt).toBe(1000);
+    await applySync(sql, payload([sheetRow(2, { status: "Cleared" }), sheetRow(3, { amount: 999 })]), 5000);
+    expect((await byId("imp-2"))).toMatchObject({ status: "cleared", statusChangedAt: 5000 });
+    expect((await byId("imp-3"))).toMatchObject({ amount: 999, statusChangedAt: 1000 });
+    await applySync(sql, payload([sheetRow(2, { status: "Cleared" }), sheetRow(3, { amount: 999 })]), 9000);
+    expect((await byId("imp-2"))!.statusChangedAt).toBe(5000);
+  });
+});

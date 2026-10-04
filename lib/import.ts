@@ -46,6 +46,7 @@ function toCheque(raw: Record<string, unknown>, index: number): Cheque {
     companyBasis: raw.companyBasis == null ? null : str(raw.companyBasis),
     sourceRow: typeof raw.sourceRow === "number" ? raw.sourceRow : null,
     companyLocked: false,
+    statusChangedAt: null,
   };
 }
 

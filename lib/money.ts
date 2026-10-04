@@ -27,13 +27,15 @@ export function parseBalance(raw: unknown): number | null {
   let n: number;
   if (typeof raw === "number") n = raw;
   else if (typeof raw === "string") {
-    const s = raw.replace(/[₱,\s]/g, "");
+    // The page shows a negative figure with a true minus sign (−); accept it when pasted back.
+    const s = raw.replace(/[₱,\s]/g, "").replace("−", "-");
     if (!/^-?\d+(\.\d+)?$/.test(s)) return null;
     n = Number(s);
   } else return null;
+  if (!Number.isFinite(n)) return null;
+  const rounded = Math.round(n * 100) / 100;
   // The database column holds up to 12 digits before the decimal point.
-  if (!Number.isFinite(n) || Math.abs(n) >= 1e12) return null;
-  return Math.round(n * 100) / 100;
+  return Math.abs(rounded) >= 1e12 ? null : rounded;
 }
 
 export function peso(n: number): string {
