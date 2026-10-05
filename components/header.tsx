@@ -1,9 +1,11 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import { logout } from "@/app/login/actions";
 import { api, ApiError } from "@/lib/api";
 import type { CompanyNames } from "@/lib/types";
+import logo from "@/public/logo.png";
 
 const KEYS = ["wwj", "wythlae", "wwjcorp"] as const;
 
@@ -44,6 +46,7 @@ export function Header({ names, onChanged }: { names: CompanyNames; onChanged: (
   return (
     <header className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
+        <Image src={logo} alt="Wythlae" width={48} height={48} priority className="h-12 w-12 shrink-0 rounded-full" />
         <h1 className="mr-auto text-2xl font-semibold">Cheque Funding Tracker</h1>
         <button type="button" className="btn" onClick={toggleTheme}>
           Light / dark
