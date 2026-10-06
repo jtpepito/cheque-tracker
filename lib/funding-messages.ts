@@ -3,7 +3,7 @@ import { shortDate } from "./dates";
 import { peso } from "./money";
 import type { CompanyProjection, Projection } from "./projection";
 import { manilaTime } from "./sync-status";
-import { COMPANIES, companyLabel, type CompanyNames } from "./types";
+import { COMPANIES, companyLabel, type Company, type CompanyNames } from "./types";
 
 // The wording of the calendar's messages, kept apart from the page so it can be tested.
 // The rule throughout: never say "covered" unless the tracker has really checked.
@@ -77,7 +77,7 @@ export function fundingMessages(projection: Projection, names: CompanyNames, tod
   return { alerts: short.map((c) => alertFor(c, label(c), today)), covered, warnings };
 }
 
-export type CardLine = { label: string; amount: number; end: number | null };
+export type CardLine = { company: Company; label: string; amount: number; end: number | null };
 
 /**
  * The lines on one day's card: each company with money clearing that day and what is left after,
@@ -91,6 +91,6 @@ export function cardLines(day: DayTotal, projection: Projection, names: CompanyN
     const firstShortHere = company?.firstShortfall?.date === day.date;
     if (amount <= 0 && !firstShortHere) return [];
     const end = company?.days.find((d) => d.date === day.date)?.end ?? null;
-    return [{ label: companyLabel(names, co), amount, end }];
+    return [{ company: co, label: companyLabel(names, co), amount, end }];
   });
 }

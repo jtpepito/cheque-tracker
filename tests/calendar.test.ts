@@ -104,3 +104,23 @@ describe("dueSoon", () => {
     expect(dueSoon(buildCalendar([cheque({ issueDate: "2026-10-06" })], TODAY))).toEqual([]);
   });
 });
+
+describe("buildCalendar: the cheques on each day", () => {
+  it("lists each day's issued cheques by company, in cheque-number order", () => {
+    const days = buildCalendar(
+      [
+        cheque({ company: "wwj", issueDate: "2026-10-05", chequeNo: "653520", payee: "Sample B", amount: 200 }),
+        cheque({ company: "wwj", issueDate: "2026-10-05", chequeNo: "653507", payee: "Sample A", amount: 100 }),
+        cheque({ company: "unassigned", issueDate: "2026-10-03", chequeNo: "WWJ1", payee: "Sample C", amount: null }),
+        cheque({ company: "wwj", issueDate: "2026-10-05", chequeNo: "999", payee: "Not this one", amount: 5, status: "cleared" }),
+      ],
+      TODAY,
+    );
+    expect(days[2].items).toEqual([
+      { company: "wwj", chequeNo: "653507", payee: "Sample A", amount: 100 },
+      { company: "wwj", chequeNo: "653520", payee: "Sample B", amount: 200 },
+      { company: "unassigned", chequeNo: "WWJ1", payee: "Sample C", amount: null },
+    ]);
+    expect(days[0].items).toEqual([]);
+  });
+});

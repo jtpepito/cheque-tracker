@@ -95,6 +95,14 @@ export function FundingCalendar({
                     <span>{s.label}</span>
                     {s.amount > 0 && <span className="font-mono">{peso(s.amount)}</span>}
                   </span>
+                  {d.items
+                    .filter((item) => item.company === s.company)
+                    .map((item, n) => (
+                      <span key={n} className="flex justify-between gap-x-2 pl-2 text-muted" title={item.payee}>
+                        <span className="font-mono">{item.chequeNo || "(no number)"}</span>
+                        <span className="font-mono">{item.amount === null ? "—" : peso(item.amount)}</span>
+                      </span>
+                    ))}
                   {s.end !== null && (
                     <span className={`block text-right font-mono ${s.end < 0 ? "font-semibold text-danger" : "opacity-70"}`}>
                       {s.end < 0 ? `short ${peso(-s.end)}` : `left ${peso(s.end)}`}

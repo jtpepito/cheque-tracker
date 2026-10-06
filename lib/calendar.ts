@@ -12,7 +12,11 @@ export type DayTotal = {
   soon: boolean;
   /** Why nothing clears this day (the holiday's name or "Weekend"); null on a banking day. */
   closed: string | null;
+  /** The cheques clearing that day, in company order then cheque-number order. */
+  items: DayItem[];
 };
+
+export type DayItem = { company: Company; chequeNo: string; payee: string; amount: number | null };
 
 /**
  * Totals of issued cheques per clearing day for `days` days starting today. A cheque dated on a
@@ -37,6 +41,12 @@ export function buildCalendar(cheques: Cheque[], today: string, holidays: Holida
       byCompany,
       soon: date <= soonUntil,
       closed: closedReason(date, holidays),
+      items: COMPANIES.flatMap((co) =>
+        onDay
+          .filter((c) => c.company === co)
+          .sort((a, b) => a.chequeNo.localeCompare(b.chequeNo, "en", { numeric: true }))
+          .map((c) => ({ company: co, chequeNo: c.chequeNo, payee: c.payee, amount: c.amount })),
+      ),
     };
   });
 }

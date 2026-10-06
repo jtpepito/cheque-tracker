@@ -127,8 +127,8 @@ describe("cardLines", () => {
         "2026-10-06",
       ),
     ).toEqual([
-      { label: "WWJ Trading", amount: 300, end: 700 },
-      { label: "Unassigned", amount: 40, end: null },
+      { company: "wwj", label: "WWJ Trading", amount: 300, end: 700 },
+      { company: "unassigned", label: "Unassigned", amount: 40, end: null },
     ]);
   });
 
@@ -136,7 +136,7 @@ describe("cardLines", () => {
     // Saturday: nothing clears, but the account is already short from an earlier cheque.
     expect(
       lines([cheque({ company: "wwj", issueDate: "2026-09-30", amount: 450 })], [balance("wwj", 400)], "2026-10-03", "2026-10-03"),
-    ).toEqual([{ label: "WWJ Trading", amount: 0, end: -50 }]);
+    ).toEqual([{ company: "wwj", label: "WWJ Trading", amount: 0, end: -50 }]);
   });
 
   it("shows nothing for a company with no cheque that day and no first shortfall", () => {
