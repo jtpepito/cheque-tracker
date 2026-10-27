@@ -1,6 +1,8 @@
 import "server-only";
 import { deleteConfig, getConfigJson, listCheques, removeCheque, setConfig, upsertCheque } from "./cheques";
 import { deriveCompany, type SiRefs } from "./company-rules";
+import { readInvoiceRows, replaceInvoices } from "./invoices";
+import type { Trading } from "./projection";
 import { readRow, type ReadRow, type RowProblem, type SheetRow } from "./sheet-rows";
 import type { Sql } from "./sql";
 import type { Cheque } from "./types";
@@ -8,7 +10,14 @@ import type { Cheque } from "./types";
 // One sync from the Google Sheet: the whole Check Issuances tab, applied in one transaction.
 // The sheet wins for everything except a company chosen by hand in the app.
 
-export type SyncPayload = { dryRun: boolean; allowRemovals: boolean; rows: SheetRow[]; siRefs: SiRefs };
+export type SyncPayload = {
+  dryRun: boolean;
+  allowRemovals: boolean;
+  rows: SheetRow[];
+  siRefs: SiRefs;
+  /** Each company's SI tab rows, when the script sends them (newer scripts only). */
+  invoices?: Partial<Record<Trading, unknown[]>>;
+};
 
 export type SyncReport = {
   at: number;
@@ -76,7 +85,14 @@ export function parsePayload(body: unknown): SyncPayload | null {
     const value = (refs as Record<string, unknown>)[key];
     if (typeof value === "string") siRefs[key] = value;
   }
-  return { dryRun: b.dryRun === true, allowRemovals: b.allowRemovals === true, rows: b.rows as SheetRow[], siRefs };
+  let invoices: SyncPayload["invoices"];
+  if (b.invoices && typeof b.invoices === "object" && !Array.isArray(b.invoices)) {
+    for (const key of COMPANY_KEYS) {
+      const list = (b.invoices as Record<string, unknown>)[key];
+      if (Array.isArray(list)) (invoices ??= {})[key] = list;
+    }
+  }
+  return { dryRun: b.dryRun === true, allowRemovals: b.allowRemovals === true, rows: b.rows as SheetRow[], siRefs, invoices };
 }
 
 /** What the sheet says about a cheque, ignoring where the row sits. */
@@ -169,6 +185,11 @@ export async function applySync(sql: Sql, payload: SyncPayload, now: number = Da
       }
       for (const c of gone) await removeCheque(t, c.id);
       report.removed = gone.length;
+
+      if (payload.invoices) {
+        const rows = COMPANY_KEYS.flatMap((co) => readInvoiceRows(co, payload.invoices![co] ?? []));
+        await replaceInvoices(t, rows);
+      }
 
       if (payload.dryRun) throw new DryRunDone(report);
       await setConfig(t, "last_sync", JSON.stringify(report));

@@ -1,0 +1,92 @@
+import "server-only";
+import { mentionsNumber } from "./company-rules";
+import { parseBalance } from "./money";
+import type { Trading } from "./projection";
+import { parseSheetDate } from "./sheet-rows";
+import type { Sql } from "./sql";
+
+// Each company's SI tab from the sheet: one row per supplier invoice, with the cheque that paid it
+// named in "Payment Details". Replaced on every sync; used only to suggest a voucher's lines.
+
+export type InvoiceRow = {
+  company: Trading;
+  row: number;
+  invoiceDate: string;
+  invoiceNo: string;
+  supplier: string;
+  gross: number | null;
+  paymentDetails: string;
+  ewt: number | null;
+  net: number | null;
+};
+
+const text = (v: unknown) => (v == null ? "" : String(v).trim());
+
+/** A money cell: a number, or text like "₱582.86"; blank or unreadable becomes null. */
+function money(v: unknown): number | null {
+  if (v == null || v === "") return null;
+  const n = typeof v === "number" ? Math.round(v * 100) / 100 : parseBalance(v);
+  return n === null || n < 0 ? null : n;
+}
+
+export function readInvoiceRows(company: Trading, raw: unknown): InvoiceRow[] {
+  if (!Array.isArray(raw)) return [];
+  const rows: InvoiceRow[] = [];
+  raw.forEach((item, index) => {
+    if (!item || typeof item !== "object") return;
+    const r = item as Record<string, unknown>;
+    const invoiceNo = text(r.invoiceNo);
+    const supplier = text(r.supplier);
+    const gross = money(r.gross);
+    if (!invoiceNo && !supplier && gross === null) return;
+    rows.push({
+      company,
+      row: typeof r.row === "number" ? r.row : index + 2,
+      invoiceDate: parseSheetDate(r.date) ?? "",
+      invoiceNo,
+      supplier,
+      gross,
+      paymentDetails: text(r.paymentDetails),
+      ewt: money(r.ewt),
+      net: money(r.net),
+    });
+  });
+  return rows;
+}
+
+const toRow = (r: Record<string, unknown>): InvoiceRow => ({
+  company: r.company as Trading,
+  row: Number(r.row),
+  invoiceDate: r.invoice_date as string,
+  invoiceNo: r.invoice_no as string,
+  supplier: r.supplier as string,
+  gross: r.gross == null ? null : Number(r.gross),
+  paymentDetails: r.payment_details as string,
+  ewt: r.ewt == null ? null : Number(r.ewt),
+  net: r.net == null ? null : Number(r.net),
+});
+
+/** Replaces the whole table with these rows. */
+export async function replaceInvoices(sql: Sql, rows: InvoiceRow[]): Promise<void> {
+  await sql.query("DELETE FROM invoices");
+  for (const r of rows) {
+    await sql.query(
+      `INSERT INTO invoices (company, row, invoice_date, invoice_no, supplier, gross, payment_details, ewt, net)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       ON CONFLICT (company, row) DO UPDATE SET invoice_date = excluded.invoice_date, invoice_no = excluded.invoice_no,
+         supplier = excluded.supplier, gross = excluded.gross, payment_details = excluded.payment_details,
+         ewt = excluded.ewt, net = excluded.net`,
+      [r.company, r.row, r.invoiceDate, r.invoiceNo, r.supplier, r.gross, r.paymentDetails, r.ewt, r.net],
+    );
+  }
+}
+
+export async function listInvoices(sql: Sql, company: Trading): Promise<InvoiceRow[]> {
+  return (await sql.query<Record<string, unknown>>("SELECT * FROM invoices WHERE company = $1 ORDER BY row", [company])).map(toRow);
+}
+
+/** The invoices this cheque pays, from its own company's tab, in sheet order. */
+export async function invoicesForCheque(sql: Sql, company: Trading, chequeNo: string): Promise<InvoiceRow[]> {
+  if (!chequeNo) return [];
+  return (await listInvoices(sql, company)).filter((r) => mentionsNumber(r.paymentDetails, chequeNo));
+}

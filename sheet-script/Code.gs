@@ -16,7 +16,6 @@ const HEADERS = {
   reference: "CR No./ SI No.",
 };
 const ID_HEADER = "Tracker ID";
-const PAYMENT_HEADER = "Payment Details";
 const MENU = "Cheque tracker";
 
 function onOpen() {
@@ -141,27 +140,63 @@ function readRows_(assignIds) {
   return rows;
 }
 
-/** The Payment Details text of each company's SI tab(s). */
-function readSiRefs_() {
+const SI_HEADERS = {
+  invoiceNo: "Supplier Inv. No.",
+  supplier: "Supplier",
+  gross: "Total Purchases",
+  paymentDetails: "Payment Details",
+  ewt: "EWT Amount",
+  net: "Amt Payable (Net of EWT)",
+};
+
+/** Each company's SI tab(s): the Payment Details text (for the company rules) and every row (for vouchers). */
+function readSiTabs_() {
+  const zone = SpreadsheetApp.getActive().getSpreadsheetTimeZone();
   const refs = {};
+  const invoices = {};
   Object.keys(SI_TABS).forEach(function (company) {
-    refs[company] = SI_TABS[company]
-      .map(function (name) {
-        const sheet = tab_(name);
-        const col = findColumns_(sheet, { payment: PAYMENT_HEADER }).payment;
-        const last = sheet.getLastRow();
-        if (last < 2) return "";
-        return sheet
-          .getRange(2, col + 1, last - 1, 1)
-          .getDisplayValues()
-          .map(function (row) {
-            return row[0];
-          })
-          .join("\n");
-      })
-      .join("\n");
+    const texts = [];
+    const rows = [];
+    SI_TABS[company].forEach(function (name) {
+      const sheet = tab_(name);
+      const cols = findColumns_(sheet, SI_HEADERS);
+      const header = headerRow_(sheet);
+      let dateCol = header.indexOf("invoice date");
+      if (dateCol < 0) dateCol = header.indexOf("date");
+      const range = sheet.getDataRange();
+      const values = range.getValues();
+      const shown = range.getDisplayValues();
+      for (let r = 1; r < values.length; r++) {
+        const cell = function (c) {
+          const v = values[r][c];
+          return typeof v === "number" ? v : shown[r][c].trim();
+        };
+        const dateOf = function (c) {
+          if (c < 0) return "";
+          const v = values[r][c];
+          return v instanceof Date ? Utilities.formatDate(v, zone, "yyyy-MM-dd") : shown[r][c].trim();
+        };
+        const invoiceNo = shown[r][cols.invoiceNo].trim();
+        const supplier = shown[r][cols.supplier].trim();
+        const gross = shown[r][cols.gross].trim();
+        texts.push(shown[r][cols.paymentDetails]);
+        if (!invoiceNo && !supplier && !gross) continue;
+        rows.push({
+          row: r + 1,
+          date: dateOf(dateCol),
+          invoiceNo: invoiceNo,
+          supplier: supplier,
+          gross: cell(cols.gross),
+          paymentDetails: shown[r][cols.paymentDetails],
+          ewt: cell(cols.ewt),
+          net: cell(cols.net),
+        });
+      }
+    });
+    refs[company] = texts.join("\n");
+    invoices[company] = rows;
   });
-  return refs;
+  return { refs: refs, invoices: invoices };
 }
 
 /**
@@ -182,11 +217,13 @@ function send_(options) {
     );
   }
 
+  const si = readSiTabs_();
   const body = {
     dryRun: !!options.dryRun,
     allowRemovals: !!options.allowRemovals,
     rows: readRows_(!options.dryRun),
-    siRefs: readSiRefs_(),
+    siRefs: si.refs,
+    invoices: si.invoices,
   };
   const response = UrlFetchApp.fetch(url + "/api/sync", {
     method: "post",

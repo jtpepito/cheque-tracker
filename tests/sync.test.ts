@@ -219,3 +219,34 @@ describe("when a status changed", () => {
     expect((await byId("imp-2"))!.statusChangedAt).toBe(5000);
   });
 });
+
+describe("invoices in a sync", () => {
+  it("stores the SI rows that come with a sync, replacing the last ones", async () => {
+    const { listInvoices } = await import("@/lib/invoices");
+    const invoices = { wythlae: [{ row: 2, date: "2026-01-07", invoiceNo: "52089", supplier: "S", gross: 10, paymentDetails: "CBC 590002 10.00", ewt: 0, net: 10 }] };
+    await applySync(sql, payload([sheetRow(2)], { invoices }));
+    expect((await listInvoices(sql, "wythlae")).map((r) => r.invoiceNo)).toEqual(["52089"]);
+    await applySync(sql, payload([sheetRow(2)], { invoices: { wythlae: [] } }));
+    expect(await listInvoices(sql, "wythlae")).toEqual([]);
+  });
+
+  it("leaves the stored SI rows alone when a sync sends none (an older script)", async () => {
+    const { listInvoices } = await import("@/lib/invoices");
+    await applySync(sql, payload([sheetRow(2)], { invoices: { wwj: [{ row: 2, invoiceNo: "1", supplier: "S", paymentDetails: "x" }] } }));
+    await applySync(sql, payload([sheetRow(2)]));
+    expect(await listInvoices(sql, "wwj")).toHaveLength(1);
+  });
+
+  it("does not store SI rows on a dry run", async () => {
+    const { listInvoices } = await import("@/lib/invoices");
+    await applySync(sql, payload([sheetRow(2)], { dryRun: true, invoices: { wwj: [{ row: 2, invoiceNo: "1", supplier: "S", paymentDetails: "x" }] } }));
+    expect(await listInvoices(sql, "wwj")).toEqual([]);
+  });
+});
+
+describe("parsePayload with invoices", () => {
+  it("keeps the invoice lists for the three companies and drops anything else", () => {
+    expect(parsePayload({ rows: [], invoices: { wwj: [{ row: 2 }], other: [1], wythlae: "x" } })!.invoices).toEqual({ wwj: [{ row: 2 }] });
+    expect(parsePayload({ rows: [] })!.invoices).toBeUndefined();
+  });
+});

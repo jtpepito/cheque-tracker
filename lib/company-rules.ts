@@ -20,6 +20,16 @@ function named(text: string): Trading | null {
   return null;
 }
 
+/**
+ * True when the cheque number's digits (5 or more) appear in the text as a whole number: not part
+ * of a longer number and not the start of an amount like 164,973.75.
+ */
+export function mentionsNumber(text: string, chequeNo: string): boolean {
+  const digits = chequeNo.replace(/\D/g, "");
+  if (digits.length < 5) return false;
+  return new RegExp(`(?<![\\d,.])${digits}(?!\\d|[,.]\\d)`).test(text);
+}
+
 export function deriveCompany(
   chequeNo: string,
   supplier: string,
@@ -30,12 +40,7 @@ export function deriveCompany(
   const inSupplier = named(supplier);
   if (inSupplier) return { company: inSupplier, basis: "supplier-label" };
 
-  const digits = chequeNo.replace(/\D/g, "");
-  if (digits.length >= 5) {
-    // The whole number, not part of a longer one and not the start of an amount like 164,973.75.
-    const whole = new RegExp(`(?<![\\d,.])${digits}(?!\\d|[,.]\\d)`);
-    const hits = (["wwj", "wythlae", "wwjcorp"] as const).filter((co) => whole.test(siRefs[co] ?? ""));
-    if (hits.length === 1) return { company: hits[0], basis: "si-crossref" };
-  }
+  const hits = (["wwj", "wythlae", "wwjcorp"] as const).filter((co) => mentionsNumber(siRefs[co] ?? "", chequeNo));
+  if (hits.length === 1) return { company: hits[0], basis: "si-crossref" };
   return { company: "unassigned", basis: "none" };
 }
