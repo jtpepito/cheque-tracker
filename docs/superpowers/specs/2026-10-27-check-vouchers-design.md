@@ -16,7 +16,7 @@ A numbered, printable Check Voucher for any cheque in the tracker, listing the i
 | Companies | A voucher needs a company. An Unassigned cheque must be given one first (the existing dropdown). |
 | Numbering | One series per company, by creation order, four digits: `WWJ-CV-0001`, `WYT-CV-0001`, `WWJC-CV-0001`. A number is never reused, even after a delete. |
 | Particulars | Filled from the sheet's SI tabs by cheque number, then editable. The voucher keeps its own copy of the lines. |
-| Print | Browser printing of a page laid out for A4 portrait, one voucher per page. No PDF library. |
+| Print | Browser printing of a page laid out for Letter portrait (changed from A4 on 27 Oct 2026), one voucher per page, signatures at the foot of the page. No PDF library. |
 | Deleting | Allowed while the cheque is still issued or pending; a voucher for a cleared or voided cheque is kept. |
 
 ## 3. Data

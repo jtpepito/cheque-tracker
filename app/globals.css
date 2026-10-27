@@ -85,7 +85,7 @@ button {
 
 @media print {
   @page {
-    size: A4 portrait;
+    size: letter portrait;
     margin: 14mm;
   }
   body {
@@ -103,12 +103,12 @@ button {
   }
 }
 
-/* The voucher is laid out as one A4 page (297mm less the 14mm margins), with the signature
+/* The voucher is laid out as one Letter page (279.4mm less the 14mm margins), with the signature
    block pushed to the foot of the page. The on-screen preview uses the same height. */
 .voucher-sheet {
   display: flex;
   flex-direction: column;
-  min-height: 269mm;
+  min-height: 251mm;
 }
 .voucher-footer {
   margin-top: auto;

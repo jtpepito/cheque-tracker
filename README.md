@@ -96,7 +96,7 @@ link at the top lists them.
 The voucher's particulars are filled from the sheet's SI tabs: every invoice whose "Payment Details"
 names the cheque number, once the sheet script version that sends the SI rows is installed. Lines can
 be added, edited, reordered and removed; the voucher keeps its own copy. **Save and print** saves the
-voucher, then opens the browser's print dialog, laid out for one A4 page. A voucher can be deleted while its cheque is still
+voucher, then opens the browser's print dialog, laid out for one Letter page. A voucher can be deleted while its cheque is still
 issued or pending; once the cheque is cleared or voided the voucher is kept.
 
 Each company's address and TIN, printed at the top of its vouchers, are entered under **Edit names**

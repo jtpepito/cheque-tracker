@@ -250,7 +250,7 @@ export function VoucherEditor({ id }: { id: string }) {
       </section>
 
       {/* The printed voucher. Shows the draft, so what you see is what prints. */}
-      <section className="voucher-sheet mx-auto max-w-[190mm] space-y-4 rounded-xl border border-line bg-white p-8 text-sm text-black">
+      <section className="voucher-sheet mx-auto max-w-[188mm] space-y-4 rounded-xl border border-line bg-white p-8 text-sm text-black">
         <header className="text-center">
           <p className="text-lg font-semibold">{view.companyName}</p>
           {view.details.address && <p>{view.details.address}</p>}
