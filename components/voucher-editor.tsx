@@ -250,7 +250,7 @@ export function VoucherEditor({ id }: { id: string }) {
       </section>
 
       {/* The printed voucher. Shows the draft, so what you see is what prints. */}
-      <section className="voucher-sheet mx-auto max-w-[188mm] space-y-4 rounded-xl border border-line bg-white p-8 text-sm text-black">
+      <section className="voucher-sheet mx-auto max-w-[192mm] space-y-3 rounded-xl border border-line bg-white p-8 text-sm text-black">
         <header className="text-center">
           <p className="text-lg font-semibold">{view.companyName}</p>
           {view.details.address && <p>{view.details.address}</p>}
@@ -318,7 +318,7 @@ export function VoucherEditor({ id }: { id: string }) {
             {(["preparedBy", "checkedBy", "approvedBy", "receivedBy"] as const).map((key, i) => (
               <div key={key}>
                 <p className="text-xs text-neutral-600">{["Prepared by", "Checked by", "Approved by", "Received by"][i]}</p>
-                <div className="h-24" />
+                <div className="h-20" />
                 <p className="border-t border-black pt-1 text-center font-medium">{draft[key] || " "}</p>
                 <p className="text-center text-[10px] text-neutral-600">Signature over printed name / date</p>
               </div>
@@ -328,11 +328,11 @@ export function VoucherEditor({ id }: { id: string }) {
             <p>Received from {view.companyName} the amount of {peso(amount)} in full payment of the above.</p>
             <div className="grid grid-cols-2 gap-x-6 pt-2">
               <div>
-                <div className="h-24" />
+                <div className="h-20" />
                 <p className="border-t border-black pt-1 text-center text-[10px] text-neutral-600">Payee: signature over printed name</p>
               </div>
               <div>
-                <div className="h-24" />
+                <div className="h-20" />
                 <p className="border-t border-black pt-1 text-center text-[10px] text-neutral-600">Date received</p>
               </div>
             </div>

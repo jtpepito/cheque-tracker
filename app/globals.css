@@ -86,7 +86,7 @@ button {
 @media print {
   @page {
     size: letter portrait;
-    margin: 14mm;
+    margin: 12mm;
   }
   body {
     background: #fff;
@@ -100,15 +100,19 @@ button {
     box-shadow: none !important;
     padding: 0 !important;
     max-width: none !important;
+    break-inside: avoid;
+  }
+  .voucher-sheet table tr {
+    break-inside: avoid;
   }
 }
 
-/* The voucher is laid out as one Letter page (279.4mm less the 14mm margins), with the signature
-   block pushed to the foot of the page. The on-screen preview uses the same height. */
+/* The voucher is laid out as one Letter page: 279.4mm less the 12mm margins, with some slack so
+   browser rounding never pushes the foot onto a second page. The signature block sits at the foot. */
 .voucher-sheet {
   display: flex;
   flex-direction: column;
-  min-height: 251mm;
+  min-height: 236mm;
 }
 .voucher-footer {
   margin-top: auto;
