@@ -66,8 +66,8 @@ export function Header({
   return (
     <header className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <Image src={logo} alt="Wythlae" width={48} height={48} priority className="h-12 w-12 shrink-0 rounded-full" />
-        <h1 className="mr-auto text-2xl font-semibold">Cheque Funding Tracker</h1>
+        <Image src={logo} alt="Wythlae and WWJ Trading Corporation" priority className="h-12 w-auto shrink-0 rounded-lg" />
+        <h1 className="mr-auto text-2xl font-semibold text-accent">Cheque Funding Tracker</h1>
         <span className="text-sm text-muted">{me.name}</span>
         {me.role === "owner" && (
           <Link href="/users" className="btn">

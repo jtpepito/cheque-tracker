@@ -33,7 +33,7 @@ A push to `main` on GitHub deploys to production (the repo is connected to the V
 `DATABASE_URL` must use Supabase's **shared pooler** host (`aws-0-ap-southeast-1.pooler.supabase.com`, user
 `postgres.<project ref>`). The `db.<ref>.supabase.co` host is IPv6-only and Vercel cannot reach it.
 
-Secrets are set in Vercel (Production): `ADMIN_PASSWORD`, `SESSION_SECRET`, `SYNC_KEY`, `DATABASE_URL`.
+Secrets are set in Vercel (Production): `SESSION_SECRET` (required; sessions never fall back to another key), `SYNC_KEY`, `DATABASE_URL`, `DATABASE_CA_CERT`, and `ADMIN_PASSWORD` until the first Owner account exists.
 `DATABASE_URL` is the Supabase **transaction pooler** string (port 6543). For the two commands below it
 is also kept in `.env.production.local` on this PC, which is git-ignored.
 

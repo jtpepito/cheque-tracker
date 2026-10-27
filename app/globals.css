@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #f1faf5;
+  --bg: #e4f6ec;
   --card: #ffffff;
-  --ink: #1f1b2e;
-  --muted: #5f5a72;
-  --line: #cfe8dc;
-  --accent: #6d3fc4;
+  --ink: #26173f;
+  --muted: #5e527a;
+  --line: #a9e0c4;
+  --accent: #7a2fc0;
   --accent-ink: #ffffff;
-  --mint: #bfead5;
+  --mint: #b4efd2;
   --warn: #fff3d6;
   --warn-ink: #7a4b00;
   --danger: #b3261e;
@@ -16,14 +16,14 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #14121c;
-    --card: #1e1b2b;
-    --ink: #ece9f7;
-    --muted: #a8a2c0;
-    --line: #33304a;
-    --accent: #b79cff;
-    --accent-ink: #1b1330;
-    --mint: #1f4a3a;
+    --bg: #16102a;
+    --card: #221842;
+    --ink: #eee8fb;
+    --muted: #b3a8d2;
+    --line: #3d2f63;
+    --accent: #c39bff;
+    --accent-ink: #1c0f36;
+    --mint: #1e5540;
     --warn: #4a3610;
     --warn-ink: #ffd98a;
     --danger: #ff8a80;
@@ -31,14 +31,14 @@
 }
 
 :root[data-theme="dark"] {
-  --bg: #14121c;
-  --card: #1e1b2b;
-  --ink: #ece9f7;
-  --muted: #a8a2c0;
-  --line: #33304a;
-  --accent: #b79cff;
-  --accent-ink: #1b1330;
-  --mint: #1f4a3a;
+  --bg: #16102a;
+  --card: #221842;
+  --ink: #eee8fb;
+  --muted: #b3a8d2;
+  --line: #3d2f63;
+  --accent: #c39bff;
+  --accent-ink: #1c0f36;
+  --mint: #1e5540;
   --warn: #4a3610;
   --warn-ink: #ffd98a;
   --danger: #ff8a80;
@@ -76,7 +76,7 @@ button {
 }
 
 .btn {
-  @apply inline-flex h-9 items-center justify-center rounded-md border border-line bg-card px-3 text-sm font-medium text-ink disabled:opacity-50;
+  @apply inline-flex h-9 items-center justify-center rounded-md border border-line bg-card px-3 text-sm font-medium text-accent disabled:opacity-50;
 }
 
 .btn-primary {
