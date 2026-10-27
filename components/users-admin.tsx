@@ -56,7 +56,15 @@ export function UsersAdmin() {
     run(`Password reset for ${u.name}.`, () => api(`/api/users/${u.id}/password`, "POST", { next }));
   }
 
-  if (me && me.role !== "owner") {
+  if (!me) {
+    return (
+      <main className="mx-auto max-w-3xl space-y-4 p-6">
+        <h1 className="text-2xl font-semibold">Users</h1>
+        {message ? <p className="text-danger">{message.text}</p> : <p className="text-muted">Loading…</p>}
+      </main>
+    );
+  }
+  if (me.role !== "owner") {
     return (
       <main className="mx-auto max-w-3xl space-y-4 p-6">
         <h1 className="text-2xl font-semibold">Users</h1>

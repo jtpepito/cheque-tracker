@@ -71,11 +71,15 @@ async function mustGet(sql: Sql, id: string): Promise<User> {
   return user;
 }
 
-/** Refuses a change that would leave no active Owner. */
-async function guardLastOwner(sql: Sql, user: User): Promise<void> {
-  if (user.role === "owner" && user.active && (await countActiveOwners(sql)) <= 1) {
-    throw new UserError("last_owner", "There must be at least one active Owner.");
-  }
+/**
+ * Refuses a change that would leave no active Owner. Runs inside the caller's transaction and
+ * locks the active Owner rows first, so two Owners removing each other at the same moment
+ * cannot both pass the count.
+ */
+async function guardLastOwner(tx: Sql, user: User): Promise<void> {
+  if (user.role !== "owner" || !user.active) return;
+  await tx.query("SELECT id FROM users WHERE role = 'owner' AND active FOR UPDATE");
+  if ((await countActiveOwners(tx)) <= 1) throw new UserError("last_owner", "There must be at least one active Owner.");
 }
 
 export async function createUser(
@@ -105,19 +109,23 @@ export async function createUser(
 }
 
 export async function setUserActive(sql: Sql, id: string, active: boolean, now: number = Date.now()): Promise<User> {
-  const user = await mustGet(sql, id);
-  if (!active && user.active) await guardLastOwner(sql, user);
-  // Deactivating ends every session the person has; reactivating does not revive them.
-  const bump = !active && user.active ? ", session_version = session_version + 1" : "";
-  await sql.query(`UPDATE users SET active = $2, updated_at = $3${bump} WHERE id = $1`, [id, active, now]);
-  return (await getUser(sql, id))!;
+  return sql.tx(async (tx) => {
+    const user = await mustGet(tx, id);
+    if (!active && user.active) await guardLastOwner(tx, user);
+    // Deactivating ends every session the person has; reactivating does not revive them.
+    const bump = !active && user.active ? ", session_version = session_version + 1" : "";
+    await tx.query(`UPDATE users SET active = $2, updated_at = $3${bump} WHERE id = $1`, [id, active, now]);
+    return (await getUser(tx, id))!;
+  });
 }
 
 export async function setUserRole(sql: Sql, id: string, role: Role, now: number = Date.now()): Promise<User> {
-  const user = await mustGet(sql, id);
-  if (role === "staff" && user.role === "owner") await guardLastOwner(sql, user);
-  await sql.query("UPDATE users SET role = $2, updated_at = $3 WHERE id = $1", [id, role, now]);
-  return (await getUser(sql, id))!;
+  return sql.tx(async (tx) => {
+    const user = await mustGet(tx, id);
+    if (role === "staff" && user.role === "owner") await guardLastOwner(tx, user);
+    await tx.query("UPDATE users SET role = $2, updated_at = $3 WHERE id = $1", [id, role, now]);
+    return (await getUser(tx, id))!;
+  });
 }
 
 /** By an Owner: a new password and an end to the person's current sessions. */

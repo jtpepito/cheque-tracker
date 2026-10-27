@@ -5,8 +5,9 @@
 export const SESSION_COOKIE = process.env.NODE_ENV === "development" ? "cheques_dev_session" : "cheques_session";
 export const SESSION_TTL_SECONDS = 60 * 60 * 12; // one working day
 
+// Never the shared password: everyone who worked here before accounts existed knew it.
 function secret(): string | null {
-  return process.env.SESSION_SECRET || process.env.ADMIN_PASSWORD || null;
+  return process.env.SESSION_SECRET || null;
 }
 
 const enc = new TextEncoder();
@@ -42,14 +43,9 @@ export async function verifySessionToken(token: string | undefined, now = Date.n
   const parts = token.split(".");
   if (parts.length !== 4) return null;
   const [expStr, userId, versionStr, sig] = parts;
+  if (!/^\d{1,15}$/.test(expStr) || !/^\d{1,9}$/.test(versionStr) || !userId || !sig) return null;
   const exp = Number(expStr);
   const version = Number(versionStr);
-  if (!Number.isInteger(exp) || !Number.isInteger(version) || !userId || !sig || exp < now / 1000) return null;
+  if (exp < now / 1000) return null;
   return safeEqual(sig, await hmac(key, `session:${exp}:${userId}:${version}`)) ? { userId, version } : null;
-}
-
-/** The shared password, used only until the first Owner account exists. */
-export function checkPassword(attempt: string): boolean {
-  const expected = process.env.ADMIN_PASSWORD;
-  return !!expected && safeEqual(attempt, expected);
 }

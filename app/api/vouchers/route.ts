@@ -19,6 +19,8 @@ export function POST(req: Request) {
   return guarded(async (user) => {
     const body = await readObject(req);
     if (!body || typeof body.chequeId !== "string") return badRequest("The request was not understood.");
-    return NextResponse.json(await createVoucherForCheque(await getSql(), body.chequeId, todayManila(), Date.now(), user.name));
+    // The shared-password owner has no name to print in "Prepared by".
+    const by = user.id === "shared" ? null : user.name;
+    return NextResponse.json(await createVoucherForCheque(await getSql(), body.chequeId, todayManila(), Date.now(), by));
   });
 }

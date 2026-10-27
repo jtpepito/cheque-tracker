@@ -1,5 +1,5 @@
 import "server-only";
-import { checkPasswordHash, normalizeUsername } from "./passwords";
+import { checkPasswordHash, hashPassword, normalizeUsername } from "./passwords";
 import { safeEqual, type SessionToken } from "./session";
 import type { Sql } from "./sql";
 import { countActiveOwners, findByUsername, getUser, SHARED_OWNER, type SessionUser } from "./users";
@@ -7,6 +7,8 @@ import { countActiveOwners, findByUsername, getUser, SHARED_OWNER, type SessionU
 // Who may sign in, and whether a cookie still stands for someone.
 
 const WRONG = "Wrong username or password.";
+// Checked when there is no such user, so an unknown username takes as long as a wrong password.
+const DUMMY_HASH = hashPassword("not-a-real-password");
 
 export async function signIn(
   sql: Sql,
@@ -23,7 +25,8 @@ export async function signIn(
     return { ok: false, error: WRONG };
   }
   const user = await findByUsername(sql, name);
-  if (!user || !user.active || !checkPasswordHash(pass, user.passwordHash)) return { ok: false, error: WRONG };
+  const passwordOk = checkPasswordHash(pass, user?.passwordHash ?? DUMMY_HASH);
+  if (!user || !user.active || !passwordOk) return { ok: false, error: WRONG };
   return { ok: true, user: { id: user.id, name: user.name, role: user.role, canApprove: user.canApprove }, version: user.sessionVersion };
 }
 

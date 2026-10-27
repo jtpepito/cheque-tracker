@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { checkPassword, createSessionToken, SESSION_TTL_SECONDS, verifySessionToken } from "@/lib/session";
+import { createSessionToken, SESSION_TTL_SECONDS, verifySessionToken } from "@/lib/session";
 
 const saved = { ...process.env };
 beforeEach(() => {
@@ -27,10 +27,17 @@ describe("session tokens", () => {
     process.env.SESSION_SECRET = "other";
     expect(await verifySessionToken(token)).toBeNull();
   });
-  it("checks the shared password and never accepts an unset one", () => {
-    expect(checkPassword("test-password")).toBe(true);
-    expect(checkPassword("wrong")).toBe(false);
-    delete process.env.ADMIN_PASSWORD;
-    expect(checkPassword("")).toBe(false);
+  it("never falls back to the shared password as the signing key", async () => {
+    const token = await createSessionToken("u1", 1);
+    delete process.env.SESSION_SECRET;
+    await expect(createSessionToken("u1", 1)).rejects.toThrow("SESSION_SECRET");
+    expect(await verifySessionToken(token)).toBeNull();
+  });
+  it("accepts only plain digits for the expiry and version", async () => {
+    const now = 1_800_000_000_000;
+    const token = await createSessionToken("u1", 1, now);
+    const [exp, id, version, sig] = token.split(".");
+    expect(await verifySessionToken(`${exp}.${id}.${version}e0.${sig}`, now)).toBeNull();
+    expect(await verifySessionToken(`0x${Number(exp).toString(16)}.${id}.${version}.${sig}`, now)).toBeNull();
   });
 });

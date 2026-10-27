@@ -73,6 +73,23 @@ describe("owner rules", () => {
   });
 });
 
+describe("the last-owner rule under concurrency", () => {
+  it("two Owners deactivating each other at the same moment leaves one active", async () => {
+    const a = await createUser(sql, ana);
+    const b = await createUser(sql, { ...ben, role: "owner" });
+    const results = await Promise.allSettled([setUserActive(sql, a.id, false), setUserActive(sql, b.id, false)]);
+    expect(results.filter((r) => r.status === "rejected")).toHaveLength(1);
+    expect(await countActiveOwners(sql)).toBe(1);
+  });
+  it("two Owners demoting each other at the same moment leaves one Owner", async () => {
+    const a = await createUser(sql, ana);
+    const b = await createUser(sql, { ...ben, role: "owner" });
+    const results = await Promise.allSettled([setUserRole(sql, a.id, "staff"), setUserRole(sql, b.id, "staff")]);
+    expect(results.filter((r) => r.status === "rejected")).toHaveLength(1);
+    expect(await countActiveOwners(sql)).toBe(1);
+  });
+});
+
 describe("passwords", () => {
   it("a reset changes the password and bumps the version", async () => {
     const b = await createUser(sql, ben);
