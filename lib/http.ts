@@ -2,6 +2,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { isSignedIn } from "./auth";
 import { ChequeError } from "./cheques";
+import { VoucherError } from "./vouchers";
 
 type Handler = () => Promise<NextResponse> | NextResponse;
 
@@ -15,6 +16,10 @@ export async function guarded(handler: Handler): Promise<NextResponse> {
   } catch (err) {
     if (err instanceof ChequeError) {
       return NextResponse.json({ error: err.message }, { status: 404 });
+    }
+    if (err instanceof VoucherError) {
+      const status = err.code === "not_found" ? 404 : err.code === "unassigned" ? 400 : 409;
+      return NextResponse.json({ error: err.message }, { status });
     }
     console.error("[api] failed:", err);
     return NextResponse.json({ error: "Something went wrong. Try again." }, { status: 500 });
