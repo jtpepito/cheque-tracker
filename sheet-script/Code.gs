@@ -140,14 +140,46 @@ function readRows_(assignIds) {
   return rows;
 }
 
+// SI tab columns, by the names they may carry (first match wins; a name may also be the start of
+// the heading, e.g. "Supplier" matches "Supplier Name"). The header row is the first of rows 1-5
+// that has a "Payment Details" heading.
 const SI_HEADERS = {
-  invoiceNo: "Supplier Inv. No.",
-  supplier: "Supplier",
-  gross: "Total Purchases",
-  paymentDetails: "Payment Details",
-  ewt: "EWT Amount",
-  net: "Amt Payable (Net of EWT)",
+  invoiceNo: ["supplier inv. no.", "supplier inv no", "supplier invoice no", "invoice no", "si no", "inv no"],
+  supplier: ["supplier", "supplier name", "name of supplier", "payee", "vendor"],
+  gross: ["total purchases", "total purchase", "gross", "total amount", "amount"],
+  paymentDetails: ["payment details", "payment detail", "payment"],
+  ewt: ["ewt amount", "ewt"],
+  net: ["amt payable (net of ewt)", "amt payable", "amount payable", "net of ewt", "net"],
 };
+
+/** Row 1 to 5 of an SI tab whose headings include "Payment Details", and the column of each heading. */
+function findSiColumns_(sheet) {
+  const last = Math.max(sheet.getLastColumn(), 1);
+  for (let row = 1; row <= Math.min(5, sheet.getLastRow()); row++) {
+    const header = sheet.getRange(row, 1, 1, last).getDisplayValues()[0].map(norm_);
+    if (!header.some(function (h) { return h.indexOf("payment detail") === 0; })) continue;
+    const cols = {};
+    Object.keys(SI_HEADERS).forEach(function (key) {
+      let index = -1;
+      SI_HEADERS[key].some(function (name) {
+        index = header.indexOf(name);
+        if (index < 0) index = header.findIndex(function (h) { return h.indexOf(name) === 0; });
+        return index >= 0;
+      });
+      if (index < 0) {
+        throw new Error(
+          'The "' + sheet.getName() + '" tab has no "' + SI_HEADERS[key][0] + '" column. Its headings are: ' +
+            header.filter(Boolean).join(" | ")
+        );
+      }
+      cols[key] = index;
+    });
+    let dateCol = header.indexOf("invoice date");
+    if (dateCol < 0) dateCol = header.indexOf("date");
+    return { headerRow: row, cols: cols, dateCol: dateCol };
+  }
+  throw new Error('The "' + sheet.getName() + '" tab has no "Payment Details" heading in its first 5 rows.');
+}
 
 /** Each company's SI tab(s): the Payment Details text (for the company rules) and every row (for vouchers). */
 function readSiTabs_() {
@@ -159,14 +191,13 @@ function readSiTabs_() {
     const rows = [];
     SI_TABS[company].forEach(function (name) {
       const sheet = tab_(name);
-      const cols = findColumns_(sheet, SI_HEADERS);
-      const header = headerRow_(sheet);
-      let dateCol = header.indexOf("invoice date");
-      if (dateCol < 0) dateCol = header.indexOf("date");
+      const found = findSiColumns_(sheet);
+      const cols = found.cols;
+      const dateCol = found.dateCol;
       const range = sheet.getDataRange();
       const values = range.getValues();
       const shown = range.getDisplayValues();
-      for (let r = 1; r < values.length; r++) {
+      for (let r = found.headerRow; r < values.length; r++) {
         const cell = function (c) {
           const v = values[r][c];
           return typeof v === "number" ? v : shown[r][c].trim();
