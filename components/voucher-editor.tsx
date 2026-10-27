@@ -318,16 +318,25 @@ export function VoucherEditor({ id }: { id: string }) {
             {(["preparedBy", "checkedBy", "approvedBy", "receivedBy"] as const).map((key, i) => (
               <div key={key}>
                 <p className="text-xs text-neutral-600">{["Prepared by", "Checked by", "Approved by", "Received by"][i]}</p>
-                <div className="h-12" />
+                <div className="h-24" />
                 <p className="border-t border-black pt-1 text-center font-medium">{draft[key] || " "}</p>
                 <p className="text-center text-[10px] text-neutral-600">Signature over printed name / date</p>
               </div>
             ))}
           </div>
-          <p className="text-xs">
-            Received from {view.companyName} the amount of {peso(amount)} in full payment of the above.
-            <span className="ml-2 inline-block w-48 border-b border-black align-bottom" /> Payee / date
-          </p>
+          <div className="text-xs">
+            <p>Received from {view.companyName} the amount of {peso(amount)} in full payment of the above.</p>
+            <div className="grid grid-cols-2 gap-x-6 pt-2">
+              <div>
+                <div className="h-24" />
+                <p className="border-t border-black pt-1 text-center text-[10px] text-neutral-600">Payee: signature over printed name</p>
+              </div>
+              <div>
+                <div className="h-24" />
+                <p className="border-t border-black pt-1 text-center text-[10px] text-neutral-600">Date received</p>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
     </main>
