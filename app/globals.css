@@ -9,8 +9,8 @@
   --accent: #7a2fc0;
   --accent-ink: #ffffff;
   --mint: #b4efd2;
-  --warn: #fff3d6;
-  --warn-ink: #7a4b00;
+  --warn: #efe6fb;
+  --warn-ink: #4c2a7c;
   --danger: #b3261e;
 }
 
@@ -24,8 +24,8 @@
     --accent: #c39bff;
     --accent-ink: #1c0f36;
     --mint: #1e5540;
-    --warn: #4a3610;
-    --warn-ink: #ffd98a;
+    --warn: #3a2a5e;
+    --warn-ink: #e6d9ff;
     --danger: #ff8a80;
   }
 }
@@ -39,8 +39,8 @@
   --accent: #c39bff;
   --accent-ink: #1c0f36;
   --mint: #1e5540;
-  --warn: #4a3610;
-  --warn-ink: #ffd98a;
+  --warn: #3a2a5e;
+  --warn-ink: #e6d9ff;
   --danger: #ff8a80;
 }
 
@@ -69,6 +69,11 @@ input,
 select,
 button {
   font: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .field {
