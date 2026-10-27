@@ -26,12 +26,19 @@ export function FundingCalendar({
       </h2>
 
       {messages.alerts.length > 0 && (
-        <div role="alert" className="rounded-lg border-2 border-accent p-3 text-sm">
-          <p className="font-semibold text-danger">Not enough in the bank:</p>
-          <ul className="mt-1 space-y-1">
-            {messages.alerts.map((text) => (
-              <li key={text}>{text}</li>
-            ))}
+        <div role="alert" className="rounded-lg border-2 border-accent p-4 text-sm leading-relaxed">
+          <p className="font-semibold text-danger">Not enough in the bank</p>
+          <ul className="mt-2 space-y-3">
+            {messages.alerts.map((text) => {
+              // The first sentence says how short; the rest explains what was counted.
+              const [first, ...rest] = text.split(/(?<=\.)\s+/);
+              return (
+                <li key={text}>
+                  <p className="font-medium">{first}</p>
+                  {rest.length > 0 && <p className="text-muted">{rest.join(" ")}</p>}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
