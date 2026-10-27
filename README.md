@@ -11,7 +11,7 @@ npm.cmd install
 npm.cmd run dev
 ```
 
-Open http://localhost:3002 and sign in with `admin`. With no `DATABASE_URL`, data is kept in an
+Open http://localhost:3002 and sign in as `owner` with password `admin` until you create an account (see Users). With no `DATABASE_URL`, data is kept in an
 in-process Postgres in `data/pglite` (git-ignored). Tests: `npm.cmd test`.
 
 To load cheques into the local database, stop the dev server and run:
@@ -102,3 +102,17 @@ issued or pending; once the cheque is cleared or voided the voucher is kept.
 Each company's address and TIN, printed at the top of its vouchers, are entered under **Edit names**
 (`PUT /api/company-details`). Tables: `vouchers`, `voucher_lines`, `voucher_series`, `invoices`
 (migration `004_vouchers.sql`).
+
+## Users
+
+Each person signs in with their own username and password. Roles: **Owner** (everything, including the
+Users page) and **Staff** (everything else). An Owner adds people under **Users** (name, username, role,
+starting password), resets passwords, deactivates and reactivates, and changes roles; everyone can change
+their own password from the header. The app refuses to deactivate or demote the last active Owner.
+
+Until an Owner account exists, the shared password () signs in as username .
+Creating the first Owner account ends that session at once: sign in again as yourself. After that the
+shared password is refused and  can be removed from Vercel (keep ).
+Deactivating a person or resetting their password ends their current sessions on their next request.
+Ten wrong sign-in attempts in 15 minutes, per address or per username, lock that address or username out
+for 15 minutes. Balances, company choices and vouchers record the name of the person who made them.
