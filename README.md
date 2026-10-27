@@ -1,4 +1,6 @@
-# Cheque Funding Tracker
+# Cheque Desk
+
+Formerly "Cheque Funding Tracker". Tracks the cheques in the Google Sheet, says how much will clear from which company on each of the next days, and prints check vouchers.
 
 How much will clear, from which company, on each of the next 14 days. One shared password.
 

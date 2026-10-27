@@ -6,7 +6,7 @@ import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Cheque Funding Tracker",
+  title: "Cheque Desk",
   description: "How much will clear, from which company, on each of the next few days.",
 };
 
