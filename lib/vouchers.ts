@@ -36,6 +36,9 @@ export type Voucher = {
   notes: string;
   createdAt: number;
   updatedAt: number;
+  /** Who made it and who last saved it, by name. */
+  createdBy: string | null;
+  updatedBy: string | null;
   lines: VoucherLine[];
 };
 
@@ -83,6 +86,8 @@ function toVoucher(r: Row, lines: VoucherLine[]): Voucher {
     notes: r.notes as string,
     createdAt: Number(r.created_at),
     updatedAt: Number(r.updated_at),
+    createdBy: (r.created_by as string | null) ?? null,
+    updatedBy: (r.updated_by as string | null) ?? null,
     lines,
   };
 }
@@ -122,7 +127,13 @@ export async function getVoucher(sql: Sql, id: string): Promise<Voucher | null> 
 }
 
 /** The cheque's voucher, made if it does not exist yet, with lines from the sheet's invoices. */
-export async function createVoucherForCheque(sql: Sql, chequeId: string, today: string, now: number = Date.now()): Promise<Voucher> {
+export async function createVoucherForCheque(
+  sql: Sql,
+  chequeId: string,
+  today: string,
+  now: number = Date.now(),
+  by: string | null = null,
+): Promise<Voucher> {
   return sql.tx(async (t) => {
     // FOR UPDATE: two "Make voucher" clicks on the same cheque at once queue here, and the second
     // then finds the first one's voucher instead of failing on the unique cheque_id.
@@ -144,9 +155,9 @@ export async function createVoucherForCheque(sql: Sql, chequeId: string, today: 
     const id = randomUUID();
     const number = `${SERIES_PREFIX[company]}${String(next).padStart(4, "0")}`;
     await t.query(
-      `INSERT INTO vouchers (id, number, company, cheque_id, voucher_date, payee, amount, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)`,
-      [id, number, company, chequeId, today, cheque.payee, cheque.amount ?? 0, now],
+      `INSERT INTO vouchers (id, number, company, cheque_id, voucher_date, payee, amount, created_at, updated_at, created_by, prepared_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, $9, $10)`,
+      [id, number, company, chequeId, today, cheque.payee, cheque.amount ?? 0, now, by, by ?? ""],
     );
     const invoices = await invoicesForCheque(t, company, cheque.cheque_no as string);
     await insertLines(
@@ -225,12 +236,18 @@ export function validateVoucherInput(raw: unknown): { ok: true; value: VoucherIn
   };
 }
 
-export async function updateVoucher(sql: Sql, id: string, input: VoucherInput, now: number = Date.now()): Promise<Voucher> {
+export async function updateVoucher(
+  sql: Sql,
+  id: string,
+  input: VoucherInput,
+  now: number = Date.now(),
+  by: string | null = null,
+): Promise<Voucher> {
   return sql.tx(async (t) => {
     const rows = await t.query<Row>(
       `UPDATE vouchers SET voucher_date = $2, payee = $3, amount = $4, prepared_by = $5, checked_by = $6, approved_by = $7,
-         received_by = $8, notes = $9, updated_at = $10 WHERE id = $1 RETURNING *`,
-      [id, input.voucherDate, input.payee, input.amount, input.preparedBy, input.checkedBy, input.approvedBy, input.receivedBy, input.notes, now],
+         received_by = $8, notes = $9, updated_at = $10, updated_by = $11 WHERE id = $1 RETURNING *`,
+      [id, input.voucherDate, input.payee, input.amount, input.preparedBy, input.checkedBy, input.approvedBy, input.receivedBy, input.notes, now, by],
     );
     if (!rows[0]) throw new VoucherError("not_found", "This voucher no longer exists.");
     await t.query("DELETE FROM voucher_lines WHERE voucher_id = $1", [id]);

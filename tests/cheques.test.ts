@@ -73,6 +73,13 @@ describe("cheques store", () => {
     });
   });
 
+  it("remembers who chose the company", async () => {
+    const c = cheque({ id: "who-1", company: "unassigned" });
+    await upsertCheque(sql, c);
+    await setCompany(sql, c.id, "wwj", "Ben Cruz");
+    expect((await listCheques(sql))[0]).toMatchObject({ company: "wwj", companySetBy: "Ben Cruz" });
+  });
+
   it("returns amounts and timestamps as numbers, not text", async () => {
     await upsertCheque(sql, cheque({ id: "n-1", amount: 100.5, createdAt: 1759449600000 }));
     await upsertCheque(sql, cheque({ id: "n-2", amount: null }));

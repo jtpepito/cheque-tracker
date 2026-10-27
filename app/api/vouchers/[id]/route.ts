@@ -28,11 +28,11 @@ export function GET(_req: Request, { params }: Params) {
 }
 
 export function PUT(req: Request, { params }: Params) {
-  return guarded(async () => {
+  return guarded(async (user) => {
     const { id } = await params;
     const v = validateVoucherInput(await readObject(req));
     if (!v.ok) return badRequest("Fix the highlighted fields.", v.errors);
-    return NextResponse.json(await updateVoucher(await getSql(), id, v.value));
+    return NextResponse.json(await updateVoucher(await getSql(), id, v.value, Date.now(), user.name));
   });
 }
 

@@ -26,6 +26,8 @@ export type Cheque = {
   companyLocked: boolean;
   /** When the tracker last saw this cheque's status change (epoch ms); null if never seen changing. */
   statusChangedAt: number | null;
+  /** Who chose the company in the app, when it was chosen by hand. */
+  companySetBy: string | null;
 };
 
 export type CompanyNames = Record<Exclude<Company, "unassigned">, string>;

@@ -16,9 +16,9 @@ export function GET() {
 }
 
 export function POST(req: Request) {
-  return guarded(async () => {
+  return guarded(async (user) => {
     const body = await readObject(req);
     if (!body || typeof body.chequeId !== "string") return badRequest("The request was not understood.");
-    return NextResponse.json(await createVoucherForCheque(await getSql(), body.chequeId, todayManila()));
+    return NextResponse.json(await createVoucherForCheque(await getSql(), body.chequeId, todayManila(), Date.now(), user.name));
   });
 }

@@ -10,7 +10,7 @@ import type { Cheque, Company } from "./types";
 export type Trading = Exclude<Company, "unassigned">;
 export const TRADING: readonly Trading[] = ["wwj", "wythlae", "wwjcorp"];
 
-export type Balance = { company: Trading; amount: number; updatedAt: number };
+export type Balance = { company: Trading; amount: number; updatedAt: number; updatedBy?: string | null };
 
 /** After this long the starting balance is too old to rely on. */
 export const STALE_BALANCE_MS = 3 * 24 * 60 * 60 * 1000;
@@ -29,6 +29,7 @@ export type CompanyProjection = {
   company: Trading;
   balance: number | null;
   updatedAt: number | null;
+  updatedBy: string | null;
   stale: boolean;
   /** Still issued from before today (or with no date): they can be presented any day, so they come off today's balance. */
   overdue: number;
@@ -108,6 +109,7 @@ export function buildProjection(
       company,
       balance: balance?.amount ?? null,
       updatedAt: balance?.updatedAt ?? null,
+      updatedBy: balance?.updatedBy ?? null,
       stale: balance !== null && now - balance.updatedAt > STALE_BALANCE_MS,
       overdue: overdue / 100,
       clearedSince: clearedSince / 100,

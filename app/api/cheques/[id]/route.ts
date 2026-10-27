@@ -6,11 +6,11 @@ import { isCompany } from "@/lib/types";
 
 // Status comes only from the sheet; the page can change a cheque's company and nothing else.
 export function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  return guarded(async () => {
+  return guarded(async (user) => {
     const { id } = await params;
     const body = await readObject(req);
     if (!body) return badRequest("The request was not understood.");
     if (!isCompany(body.company)) return badRequest("Unknown company.");
-    return NextResponse.json(await setCompany(await getSql(), id, body.company));
+    return NextResponse.json(await setCompany(await getSql(), id, body.company, user.name));
   });
 }

@@ -32,18 +32,18 @@ describe("balances store", () => {
   });
 
   it("saves a balance per company with the time it was entered, as numbers", async () => {
-    expect(await setBalance(sql, "wwj", 1250000.5, 1000)).toEqual({ company: "wwj", amount: 1250000.5, updatedAt: 1000 });
+    expect(await setBalance(sql, "wwj", 1250000.5, 1000)).toEqual({ company: "wwj", amount: 1250000.5, updatedAt: 1000, updatedBy: null });
     await setBalance(sql, "wythlae", -300, 2000);
     expect(await listBalances(sql)).toEqual([
-      { company: "wwj", amount: 1250000.5, updatedAt: 1000 },
-      { company: "wythlae", amount: -300, updatedAt: 2000 },
+      { company: "wwj", amount: 1250000.5, updatedAt: 1000, updatedBy: null },
+      { company: "wythlae", amount: -300, updatedAt: 2000, updatedBy: null },
     ]);
   });
 
   it("replaces a company's balance when it is entered again", async () => {
     await setBalance(sql, "wwj", 100, 1000);
     await setBalance(sql, "wwj", 250, 5000);
-    expect(await listBalances(sql)).toEqual([{ company: "wwj", amount: 250, updatedAt: 5000 }]);
+    expect(await listBalances(sql)).toEqual([{ company: "wwj", amount: 250, updatedAt: 5000, updatedBy: null }]);
   });
 
   it("refuses a company that has no bank account of its own", async () => {
@@ -59,5 +59,16 @@ describe("parseBalance edge cases", () => {
   it("rejects a figure that only reaches the limit after rounding", () => {
     expect(parseBalance(999999999999.999)).toBeNull();
     expect(parseBalance("999,999,999,999.99")).toBe(999999999999.99);
+  });
+});
+
+describe("who entered a balance", () => {
+  it("remembers the name, or null when none was given", async () => {
+    await setBalance(sql, "wwj", 1, 1000, "Ana Reyes");
+    await setBalance(sql, "wythlae", 2, 2000);
+    expect(await listBalances(sql)).toEqual([
+      { company: "wwj", amount: 1, updatedAt: 1000, updatedBy: "Ana Reyes" },
+      { company: "wythlae", amount: 2, updatedAt: 2000, updatedBy: null },
+    ]);
   });
 });

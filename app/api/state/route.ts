@@ -9,7 +9,7 @@ import { getCompanyDetails, vouchersByCheque } from "@/lib/vouchers";
 export const dynamic = "force-dynamic";
 
 export function GET() {
-  return guarded(async () => {
+  return guarded(async (user) => {
     const sql = await getSql();
     const [companies, holidays, sync, refusal, balances, vouchers, companyDetails, cheques] = await Promise.all([
       getCompanyNames(sql),
@@ -22,7 +22,7 @@ export function GET() {
       listCheques(sql),
     ]);
     return NextResponse.json(
-      { today: todayManila(), now: Date.now(), companies, holidays, sync, refusal, balances, vouchers, companyDetails, cheques },
+      { today: todayManila(), now: Date.now(), me: user, companies, holidays, sync, refusal, balances, vouchers, companyDetails, cheques },
       { headers: { "cache-control": "no-store" } },
     );
   });

@@ -4,12 +4,17 @@ import { readInvoiceRows, replaceInvoices } from "@/lib/invoices";
 import type { Sql } from "@/lib/sql";
 import {
   createVoucherForCheque, deleteVoucher, getCompanyDetails, getVoucher, listVouchers, setCompanyDetails,
-  updateVoucher, validateVoucherInput, VoucherError, vouchersByCheque, type VoucherInput,
+  updateVoucher, validateVoucherInput, VoucherError, vouchersByCheque, type Voucher, type VoucherInput,
 } from "@/lib/vouchers";
 import { resetDb, testSql } from "./db";
 import { cheque } from "./helpers";
 
 const TODAY = "2026-10-27";
+const toInput = (v: Voucher): VoucherInput => ({
+  voucherDate: v.voucherDate, payee: v.payee, amount: v.amount, preparedBy: v.preparedBy, checkedBy: v.checkedBy,
+  approvedBy: v.approvedBy, receivedBy: v.receivedBy, notes: v.notes,
+  lines: v.lines.map(({ invoiceNo, invoiceDate, description, gross, ewt, net }) => ({ invoiceNo, invoiceDate, description, gross, ewt, net })),
+});
 let sql: Sql;
 beforeEach(async () => {
   sql = await testSql();
@@ -157,5 +162,16 @@ describe("company details", () => {
     expect((await getCompanyDetails(sql)).wwj).toEqual({ address: "", tin: "" });
     await setCompanyDetails(sql, { wwj: { address: "1 Sample St, Cebu", tin: "000-000-000-000" }, wythlae: { address: "", tin: "" }, wwjcorp: { address: "", tin: "" } });
     expect((await getCompanyDetails(sql)).wwj).toEqual({ address: "1 Sample St, Cebu", tin: "000-000-000-000" });
+  });
+});
+
+describe("who made and saved a voucher", () => {
+  it("records the maker, pre-fills Prepared by, and records the last saver", async () => {
+    const v = await createVoucherForCheque(sql, "c1", TODAY, 1000, "Ana Reyes");
+    expect(v).toMatchObject({ createdBy: "Ana Reyes", updatedBy: null, preparedBy: "Ana Reyes" });
+    const saved = await updateVoucher(sql, v.id, { ...toInput(v), preparedBy: "Ana R." }, 2000, "Ben Cruz");
+    expect(saved).toMatchObject({ createdBy: "Ana Reyes", updatedBy: "Ben Cruz", preparedBy: "Ana R." });
+    const anon = await createVoucherForCheque(sql, "c2", TODAY);
+    expect(anon).toMatchObject({ createdBy: null, preparedBy: "" });
   });
 });
