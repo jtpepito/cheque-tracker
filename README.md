@@ -110,9 +110,9 @@ Users page) and **Staff** (everything else). An Owner adds people under **Users*
 starting password), resets passwords, deactivates and reactivates, and changes roles; everyone can change
 their own password from the header. The app refuses to deactivate or demote the last active Owner.
 
-Until an Owner account exists, the shared password () signs in as username .
+Until an Owner account exists, the shared password (`ADMIN_PASSWORD`) signs in as username `owner`.
 Creating the first Owner account ends that session at once: sign in again as yourself. After that the
-shared password is refused and  can be removed from Vercel (keep ).
+shared password is refused and `ADMIN_PASSWORD` can be removed from Vercel (keep `SESSION_SECRET`).
 Deactivating a person or resetting their password ends their current sessions on their next request.
 Ten wrong sign-in attempts in 15 minutes, per address or per username, lock that address or username out
 for 15 minutes. Balances, company choices and vouchers record the name of the person who made them.
