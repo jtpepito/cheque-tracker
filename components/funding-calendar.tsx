@@ -27,7 +27,7 @@ export function FundingCalendar({
 
       {messages.alerts.length > 0 && (
         <div role="alert" className="rounded-lg border-2 border-accent p-4 text-sm leading-relaxed">
-          <p className="font-semibold text-danger">Not enough in the bank</p>
+          <p className="font-bold uppercase tracking-wide text-danger">Not enough in the bank</p>
           <ul className="mt-2 space-y-3">
             {messages.alerts.map((text) => {
               // The first sentence says how short; the rest explains what was counted.
