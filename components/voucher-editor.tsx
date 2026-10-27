@@ -312,19 +312,23 @@ export function VoucherEditor({ id }: { id: string }) {
           </tbody>
         </table>
         {draft.notes && <p className="whitespace-pre-wrap">{draft.notes}</p>}
-        <div className="grid grid-cols-2 gap-x-6 gap-y-8 pt-6 sm:grid-cols-4">
-          {(["preparedBy", "checkedBy", "approvedBy", "receivedBy"] as const).map((key, i) => (
-            <div key={key} className="border-t border-black pt-1">
-              <p className="text-xs text-neutral-600">{["Prepared by", "Checked by", "Approved by", "Received by"][i]}</p>
-              <p className="min-h-5 font-medium">{draft[key]}</p>
-              <p className="text-xs text-neutral-600">Signature / date</p>
-            </div>
-          ))}
+        {/* Sits at the foot of the page: label, room to sign, then the name under the line. */}
+        <div className="voucher-footer space-y-6">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-6 sm:grid-cols-4">
+            {(["preparedBy", "checkedBy", "approvedBy", "receivedBy"] as const).map((key, i) => (
+              <div key={key}>
+                <p className="text-xs text-neutral-600">{["Prepared by", "Checked by", "Approved by", "Received by"][i]}</p>
+                <div className="h-12" />
+                <p className="border-t border-black pt-1 text-center font-medium">{draft[key] || " "}</p>
+                <p className="text-center text-[10px] text-neutral-600">Signature over printed name / date</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs">
+            Received from {view.companyName} the amount of {peso(amount)} in full payment of the above.
+            <span className="ml-2 inline-block w-48 border-b border-black align-bottom" /> Payee / date
+          </p>
         </div>
-        <p className="pt-4 text-xs">
-          Received from {view.companyName} the amount of {peso(amount)} in full payment of the above.
-          <span className="ml-2 inline-block w-48 border-b border-black align-bottom" /> Payee / date
-        </p>
       </section>
     </main>
   );
