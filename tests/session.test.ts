@@ -10,24 +10,24 @@ afterEach(() => {
   process.env = { ...saved };
 });
 
-describe("session", () => {
-  it("accepts its own token and rejects a tampered or expired one", async () => {
+describe("session tokens", () => {
+  it("carry the user id and version, and reject tampering and expiry", async () => {
     const now = 1_800_000_000_000;
-    const token = await createSessionToken(now);
-    expect(await verifySessionToken(token, now)).toBe(true);
-    expect(await verifySessionToken(token + "0", now)).toBe(false);
-    expect(await verifySessionToken(undefined, now)).toBe(false);
-    expect(await verifySessionToken("garbage", now)).toBe(false);
-    expect(await verifySessionToken(token, now + (SESSION_TTL_SECONDS + 1) * 1000)).toBe(false);
+    const token = await createSessionToken("u1", 3, now);
+    expect(await verifySessionToken(token, now)).toEqual({ userId: "u1", version: 3 });
+    expect(await verifySessionToken(token.replace(".3.", ".4."), now)).toBeNull();
+    expect(await verifySessionToken(token.replace("u1", "u2"), now)).toBeNull();
+    expect(await verifySessionToken(token + "0", now)).toBeNull();
+    expect(await verifySessionToken(undefined, now)).toBeNull();
+    expect(await verifySessionToken("garbage", now)).toBeNull();
+    expect(await verifySessionToken(token, now + (SESSION_TTL_SECONDS + 1) * 1000)).toBeNull();
   });
-
   it("rejects tokens signed with another secret", async () => {
-    const token = await createSessionToken();
+    const token = await createSessionToken("u1", 1);
     process.env.SESSION_SECRET = "other";
-    expect(await verifySessionToken(token)).toBe(false);
+    expect(await verifySessionToken(token)).toBeNull();
   });
-
-  it("checks the password and never accepts an unset one", () => {
+  it("checks the shared password and never accepts an unset one", () => {
     expect(checkPassword("test-password")).toBe(true);
     expect(checkPassword("wrong")).toBe(false);
     delete process.env.ADMIN_PASSWORD;

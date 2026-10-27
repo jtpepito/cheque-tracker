@@ -1,10 +1,14 @@
 import "server-only";
 import { cookies, headers } from "next/headers";
+import { resolveSessionUser } from "./login";
 import { SESSION_COOKIE, verifySessionToken } from "./session";
+import type { Sql } from "./sql";
+import type { SessionUser } from "./users";
 
-/** Re-checks the session inside route handlers. Middleware already gates every request. */
-export async function isSignedIn(): Promise<boolean> {
-  return verifySessionToken((await cookies()).get(SESSION_COOKIE)?.value);
+/** The signed-in person, checked against the database. Middleware already checked the signature. */
+export async function currentUser(sql: Sql): Promise<SessionUser | null> {
+  const token = await verifySessionToken((await cookies()).get(SESSION_COOKIE)?.value);
+  return token ? resolveSessionUser(sql, token) : null;
 }
 
 /** Mark cookies Secure when the request came over HTTPS (Vercel), not on plain-HTTP localhost. */

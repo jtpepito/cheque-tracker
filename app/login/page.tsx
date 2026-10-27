@@ -12,6 +12,10 @@ export default function LoginPage() {
       <div className="rounded-xl border border-line bg-card p-5">
         <LoginForm />
       </div>
+      <p className="text-center text-xs text-muted">
+        First time? Sign in with username <span className="font-mono">owner</span> and the shared password, then create your
+        own account under Users.
+      </p>
     </main>
   );
 }

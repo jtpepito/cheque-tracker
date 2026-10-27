@@ -1,7 +1,7 @@
 // HMAC-signed session cookie. Uses Web Crypto so the same code runs in middleware (edge
-// runtime) and in route handlers (Node).
+// runtime) and in route handlers (Node). The cookie says who is signed in and which session
+// version they had; whether that is still valid is checked against the database by the routes.
 
-// Browsers share cookies across localhost ports, so the dev server uses its own name.
 export const SESSION_COOKIE = process.env.NODE_ENV === "development" ? "cheques_dev_session" : "cheques_session";
 export const SESSION_TTL_SECONDS = 60 * 60 * 12; // one working day
 
@@ -26,23 +26,29 @@ export function safeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-/** Cookie value: "<expiry-unix-seconds>.<hmac>". */
-export async function createSessionToken(now = Date.now()): Promise<string> {
+export type SessionToken = { userId: string; version: number };
+
+/** Cookie value: "<expiry-unix-seconds>.<user id>.<version>.<hmac>". */
+export async function createSessionToken(userId: string, version: number, now = Date.now()): Promise<string> {
   const key = secret();
-  if (!key) throw new Error("ADMIN_PASSWORD is not set");
+  if (!key) throw new Error("SESSION_SECRET is not set");
   const exp = Math.floor(now / 1000) + SESSION_TTL_SECONDS;
-  return `${exp}.${await hmac(key, `session:${exp}`)}`;
+  return `${exp}.${userId}.${version}.${await hmac(key, `session:${exp}:${userId}:${version}`)}`;
 }
 
-export async function verifySessionToken(token: string | undefined, now = Date.now()): Promise<boolean> {
+export async function verifySessionToken(token: string | undefined, now = Date.now()): Promise<SessionToken | null> {
   const key = secret();
-  if (!key || !token) return false;
-  const [expStr, sig] = token.split(".");
+  if (!key || !token) return null;
+  const parts = token.split(".");
+  if (parts.length !== 4) return null;
+  const [expStr, userId, versionStr, sig] = parts;
   const exp = Number(expStr);
-  if (!Number.isInteger(exp) || !sig || exp < now / 1000) return false;
-  return safeEqual(sig, await hmac(key, `session:${exp}`));
+  const version = Number(versionStr);
+  if (!Number.isInteger(exp) || !Number.isInteger(version) || !userId || !sig || exp < now / 1000) return null;
+  return safeEqual(sig, await hmac(key, `session:${exp}:${userId}:${version}`)) ? { userId, version } : null;
 }
 
+/** The shared password, used only until the first Owner account exists. */
 export function checkPassword(attempt: string): boolean {
   const expected = process.env.ADMIN_PASSWORD;
   return !!expected && safeEqual(attempt, expected);

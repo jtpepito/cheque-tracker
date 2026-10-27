@@ -8,6 +8,12 @@ export function LoginForm() {
   return (
     <form action={action} className="space-y-4">
       <div className="space-y-1.5">
+        <label htmlFor="username" className="text-sm font-medium">
+          Username
+        </label>
+        <input id="username" name="username" autoComplete="username" autoFocus required className="field" />
+      </div>
+      <div className="space-y-1.5">
         <label htmlFor="password" className="text-sm font-medium">
           Password
         </label>
@@ -16,7 +22,6 @@ export function LoginForm() {
           name="password"
           type="password"
           autoComplete="current-password"
-          autoFocus
           required
           aria-invalid={!!state.error || undefined}
           className="field"

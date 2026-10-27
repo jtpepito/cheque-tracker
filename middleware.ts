@@ -7,7 +7,7 @@ export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   if (pathname === "/api/sync") return NextResponse.next();
 
-  const authed = await verifySessionToken(req.cookies.get(SESSION_COOKIE)?.value);
+  const authed = !!(await verifySessionToken(req.cookies.get(SESSION_COOKIE)?.value));
 
   if (pathname === "/login") {
     return authed ? NextResponse.redirect(new URL("/", req.url)) : NextResponse.next();
