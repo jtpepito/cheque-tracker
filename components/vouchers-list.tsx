@@ -5,16 +5,22 @@ import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { shortDate } from "@/lib/dates";
 import { peso } from "@/lib/money";
-import { DEFAULT_COMPANY_NAMES, companyLabel } from "@/lib/types";
+import { DEFAULT_COMPANY_NAMES, companyLabel, type CompanyNames } from "@/lib/types";
 import type { VoucherSummary } from "@/lib/vouchers";
 
 export function VouchersList() {
   const [list, setList] = useState<VoucherSummary[] | null>(null);
+  const [names, setNames] = useState<CompanyNames>(DEFAULT_COMPANY_NAMES);
   const [problem, setProblem] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    api<VoucherSummary[]>("/api/vouchers").then(setList, (err) => setProblem(err instanceof ApiError ? err.message : "Couldn't load the vouchers."));
+    api<{ vouchers: VoucherSummary[]; names: CompanyNames }>("/api/vouchers").then(
+      (r) => {
+        setList(r.vouchers);
+        setNames(r.names);
+      },
+      (err) => setProblem(err instanceof ApiError ? err.message : "Couldn't load the vouchers."));
   }, []);
 
   const q = search.trim().toLowerCase();
@@ -56,7 +62,7 @@ export function VouchersList() {
               <span className="truncate">{v.payee || "(no payee)"}</span>
               <span className="font-mono sm:text-right">{peso(v.amount)}</span>
               <span className="text-muted">
-                {companyLabel(DEFAULT_COMPANY_NAMES, v.company)} · {v.chequeNo ?? "no cheque"}
+                {companyLabel(names, v.company)} · {v.chequeNo ?? "no cheque"}
               </span>
             </Link>
           </li>

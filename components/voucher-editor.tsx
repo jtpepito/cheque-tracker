@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { shortDate } from "@/lib/dates";
 import type { InvoiceRow } from "@/lib/invoices";
-import { peso, sumAmounts } from "@/lib/money";
+import { parseBalance, peso, sumAmounts } from "@/lib/money";
 import type { Status } from "@/lib/types";
 import type { Voucher, VoucherLine } from "@/lib/vouchers";
 import { amountInWords } from "@/lib/words";
@@ -31,10 +31,8 @@ const toDraft = (v: Voucher): Draft => ({
   lines: v.lines.map((l) => ({ invoiceNo: l.invoiceNo, invoiceDate: l.invoiceDate, description: l.description, gross: money(l.gross), ewt: money(l.ewt), net: money(l.net) })),
 });
 const blankLine = (): LineDraft => ({ invoiceNo: "", invoiceDate: "", description: "", gross: "", ewt: "", net: "" });
-const asNumber = (s: string) => {
-  const n = Number(s.replace(/[₱,\s]/g, ""));
-  return s.trim() === "" || Number.isNaN(n) ? null : n;
-};
+// The same reading as the server's, so the preview never shows a figure the save would refuse.
+const asNumber = (s: string) => (s.trim() === "" ? null : parseBalance(s));
 
 export function VoucherEditor({ id }: { id: string }) {
   const router = useRouter();
@@ -69,7 +67,8 @@ export function VoucherEditor({ id }: { id: string }) {
   const netTotal = sumAmounts(draft.lines.map((l) => asNumber(l.net)));
   const mismatch = draft.lines.length > 0 && Math.round(netTotal * 100) !== Math.round(amount * 100);
 
-  async function save() {
+  /** Saves and says whether it worked, so printing can wait for a successful save. */
+  async function save(): Promise<boolean> {
     setBusy(true);
     setErrors({});
     setMessage(null);
@@ -78,6 +77,8 @@ export function VoucherEditor({ id }: { id: string }) {
       setView({ ...view!, voucher: saved });
       setDraft(toDraft(saved));
       setMessage({ kind: "ok", text: "Saved." });
+      setBusy(false);
+      return true;
     } catch (err) {
       if (err instanceof ApiError) {
         setErrors(err.errors ?? {});
@@ -85,7 +86,21 @@ export function VoucherEditor({ id }: { id: string }) {
       } else setMessage({ kind: "error", text: "Something went wrong. Try again." });
     }
     setBusy(false);
+    return false;
   }
+
+  /** Prints what was saved: an unsaved draft is saved first, and a refused draft is not printed. */
+  async function print() {
+    if (await save()) window.print();
+  }
+
+  const moveLine = (i: number, by: -1 | 1) => {
+    const lines = [...draft!.lines];
+    const j = i + by;
+    if (j < 0 || j >= lines.length) return;
+    [lines[i], lines[j]] = [lines[j], lines[i]];
+    set("lines", lines);
+  };
 
   async function fillFromSheet() {
     if (!view!.voucher.chequeId) return;
@@ -180,20 +195,28 @@ export function VoucherEditor({ id }: { id: string }) {
         {draft.lines.length === 0 && <p className="text-sm text-muted">No lines yet. Fill from the sheet, or add a line.</p>}
         <ul className="space-y-2">
           {draft.lines.map((l, i) => (
-            <li key={i} className="grid gap-2 rounded-lg border border-line p-2 text-sm sm:grid-cols-[7rem_8rem_minmax(0,1fr)_7rem_6rem_7rem_auto] sm:items-center">
+            <li key={i} className="grid gap-2 rounded-lg border border-line p-2 text-sm sm:grid-cols-[7rem_8rem_minmax(0,1fr)_7rem_6rem_7rem_auto_auto] sm:items-center">
               <input className="field" placeholder="Invoice no." value={l.invoiceNo} onChange={(e) => setLine(i, "invoiceNo", e.target.value)} aria-label={`Line ${i + 1} invoice no.`} />
               <input className="field" type="date" value={l.invoiceDate} onChange={(e) => setLine(i, "invoiceDate", e.target.value)} aria-label={`Line ${i + 1} date`} aria-invalid={!!errors[`lines.${i}.invoiceDate`] || undefined} />
               <input className="field" placeholder="Description" value={l.description} onChange={(e) => setLine(i, "description", e.target.value)} aria-label={`Line ${i + 1} description`} />
               <input className="field" placeholder="Gross" value={l.gross} onChange={(e) => setLine(i, "gross", e.target.value)} aria-label={`Line ${i + 1} gross`} aria-invalid={!!errors[`lines.${i}.gross`] || undefined} />
               <input className="field" placeholder="EWT" value={l.ewt} onChange={(e) => setLine(i, "ewt", e.target.value)} aria-label={`Line ${i + 1} EWT`} aria-invalid={!!errors[`lines.${i}.ewt`] || undefined} />
               <input className="field" placeholder="Net" value={l.net} onChange={(e) => setLine(i, "net", e.target.value)} aria-label={`Line ${i + 1} net`} aria-invalid={!!errors[`lines.${i}.net`] || undefined} />
+              <span className="flex gap-1">
+                <button type="button" className="btn" disabled={i === 0} onClick={() => moveLine(i, -1)} aria-label={`Move line ${i + 1} up`}>
+                  ↑
+                </button>
+                <button type="button" className="btn" disabled={i === draft.lines.length - 1} onClick={() => moveLine(i, 1)} aria-label={`Move line ${i + 1} down`}>
+                  ↓
+                </button>
+              </span>
               <button type="button" className="btn" onClick={() => set("lines", draft.lines.filter((_, n) => n !== i))} aria-label={`Remove line ${i + 1}`}>
                 Remove
               </button>
               {Object.entries(errors)
                 .filter(([k]) => k.startsWith(`lines.${i}.`))
                 .map(([k, text]) => (
-                  <span key={k} className="text-danger sm:col-span-7">
+                  <span key={k} className="text-danger sm:col-span-8">
                     {text}
                   </span>
                 ))}
@@ -210,8 +233,8 @@ export function VoucherEditor({ id }: { id: string }) {
           <button type="button" className="btn btn-primary h-10 px-5" disabled={busy} onClick={save}>
             {busy ? "Working…" : "Save"}
           </button>
-          <button type="button" className="btn h-10" onClick={() => window.print()}>
-            Print
+          <button type="button" className="btn h-10" disabled={busy} onClick={print}>
+            Save and print
           </button>
           {canDelete && (
             <button type="button" className="btn h-10" disabled={busy} onClick={remove}>

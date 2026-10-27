@@ -237,10 +237,11 @@ describe("invoices in a sync", () => {
     expect(await listInvoices(sql, "wwj")).toHaveLength(1);
   });
 
-  it("does not store SI rows on a dry run", async () => {
+  it("does not store SI rows on a dry run, and keeps the ones it had", async () => {
     const { listInvoices } = await import("@/lib/invoices");
+    await applySync(sql, payload([sheetRow(2)], { invoices: { wwj: [{ row: 9, invoiceNo: "OLD", supplier: "S", paymentDetails: "x" }] } }));
     await applySync(sql, payload([sheetRow(2)], { dryRun: true, invoices: { wwj: [{ row: 2, invoiceNo: "1", supplier: "S", paymentDetails: "x" }] } }));
-    expect(await listInvoices(sql, "wwj")).toEqual([]);
+    expect((await listInvoices(sql, "wwj")).map((r) => r.invoiceNo)).toEqual(["OLD"]);
   });
 });
 

@@ -124,7 +124,9 @@ export async function getVoucher(sql: Sql, id: string): Promise<Voucher | null> 
 /** The cheque's voucher, made if it does not exist yet, with lines from the sheet's invoices. */
 export async function createVoucherForCheque(sql: Sql, chequeId: string, today: string, now: number = Date.now()): Promise<Voucher> {
   return sql.tx(async (t) => {
-    const cheque = (await t.query<Row>("SELECT * FROM cheques WHERE id = $1", [chequeId]))[0];
+    // FOR UPDATE: two "Make voucher" clicks on the same cheque at once queue here, and the second
+    // then finds the first one's voucher instead of failing on the unique cheque_id.
+    const cheque = (await t.query<Row>("SELECT * FROM cheques WHERE id = $1 FOR UPDATE", [chequeId]))[0];
     if (!cheque) throw new VoucherError("not_found", "This cheque no longer exists. Refresh the page.");
     const existing = (await t.query<Row>("SELECT id FROM vouchers WHERE cheque_id = $1", [chequeId]))[0];
     if (existing) return (await getVoucher(t, existing.id as string))!;

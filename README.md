@@ -90,13 +90,13 @@ put the heading back rather than re-running it.
 
 Every cheque in the register can have one Check Voucher: open it with the **Voucher** button on the
 cheque's row (an Unassigned cheque needs a company first). Vouchers are numbered per company in order
-of creation (`WWJ-CV-0001`, `WYT-CV-0001`, `WWJC-CV-0001`); a number is never reused. The **Vouchers**
+of creation (`WWJ-CV-0001`, `WYT-CV-0001`, `WWJC-CV-0001`, five digits after 9999); a number is never reused. The **Vouchers**
 link at the top lists them.
 
 The voucher's particulars are filled from the sheet's SI tabs: every invoice whose "Payment Details"
 names the cheque number, once the sheet script version that sends the SI rows is installed. Lines can
-be added, edited and removed before printing; the voucher keeps its own copy. **Print** uses the
-browser's print dialog, laid out for one A4 page. A voucher can be deleted while its cheque is still
+be added, edited, reordered and removed; the voucher keeps its own copy. **Save and print** saves the
+voucher, then opens the browser's print dialog, laid out for one A4 page. A voucher can be deleted while its cheque is still
 issued or pending; once the cheque is cleared or voided the voucher is kept.
 
 Each company's address and TIN, printed at the top of its vouchers, are entered under **Edit names**

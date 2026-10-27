@@ -26,7 +26,8 @@ const text = (v: unknown) => (v == null ? "" : String(v).trim());
 function money(v: unknown): number | null {
   if (v == null || v === "") return null;
   const n = typeof v === "number" ? Math.round(v * 100) / 100 : parseBalance(v);
-  return n === null || n < 0 ? null : n;
+  // Negative or too large for the column: left blank rather than failing the whole sync.
+  return n === null || n < 0 || n >= 1e12 ? null : n;
 }
 
 export function readInvoiceRows(company: Trading, raw: unknown): InvoiceRow[] {

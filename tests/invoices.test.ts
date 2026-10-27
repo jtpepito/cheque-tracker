@@ -51,6 +51,10 @@ describe("readInvoiceRows", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].row).toBe(4);
   });
+  it("drops a figure too large for the database instead of failing the whole sync", () => {
+    const [r] = readInvoiceRows("wwj", [raw({ gross: 1e13, net: "9,999,999,999,999" })]);
+    expect(r).toMatchObject({ gross: null, net: null });
+  });
   it("returns nothing for input that is not a list", () => {
     expect(readInvoiceRows("wwj", "x")).toEqual([]);
   });

@@ -202,6 +202,7 @@ export function Register({
               >
                 {vouchers[c.id] ? "Voucher" : "Make voucher"}
               </button>
+              {c.company === "unassigned" && <p className="text-xs text-muted md:col-span-7">Choose a company to make a voucher.</p>}
             </li>
           ))}
         </ul>
