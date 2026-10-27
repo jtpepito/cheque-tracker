@@ -7,6 +7,7 @@ import { buildCalendar } from "@/lib/calendar";
 import { latestOnly } from "@/lib/latest";
 import { buildProjection, type Balance } from "@/lib/projection";
 import type { SyncRefusal, SyncReport } from "@/lib/sync";
+import type { SessionUser } from "@/lib/users";
 import type { CompanyDetails } from "@/lib/vouchers";
 import type { Cheque, CompanyNames } from "@/lib/types";
 import { Balances } from "./balances";
@@ -17,6 +18,7 @@ import { Register } from "./register";
 import { SyncStatus } from "./sync-status";
 
 type State = {
+  me: SessionUser;
   today: string;
   now: number;
   companies: CompanyNames;
@@ -68,7 +70,7 @@ export function Tracker() {
 
   return (
     <main className="mx-auto max-w-6xl space-y-8 p-4 sm:p-6">
-      <Header names={state.companies} details={state.companyDetails} onChanged={refresh} />
+      <Header me={state.me} names={state.companies} details={state.companyDetails} onChanged={refresh} />
       {problem && (
         <p role="alert" className="rounded-lg bg-warn p-3 text-sm text-warn-ink">
           {problem} Showing the last data loaded; trying again shortly.

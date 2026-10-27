@@ -9,9 +9,10 @@ export async function middleware(req: NextRequest) {
 
   const authed = !!(await verifySessionToken(req.cookies.get(SESSION_COOKIE)?.value));
 
-  if (pathname === "/login") {
-    return authed ? NextResponse.redirect(new URL("/", req.url)) : NextResponse.next();
-  }
+  // The sign-in page is always reachable. A cookie can carry a valid signature for a person who
+  // was since deactivated (or for the shared owner once an account exists); sending such a
+  // visitor away from /login would bounce them between the page and the sign-in forever.
+  if (pathname === "/login") return NextResponse.next();
   if (authed) return NextResponse.next();
 
   if (pathname.startsWith("/api/") || (req.method !== "GET" && req.method !== "HEAD")) {

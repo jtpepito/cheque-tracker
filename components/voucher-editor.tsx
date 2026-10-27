@@ -167,6 +167,10 @@ export function VoucherEditor({ id }: { id: string }) {
         ) : (
           <p className="text-sm text-warn-ink">This cheque is no longer in the sheet.</p>
         )}
+        <p className="text-xs text-muted">
+          Made by {v.createdBy ?? "unknown"}
+          {v.updatedBy ? ` · last saved by ${v.updatedBy}` : ""}
+        </p>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {field("voucherDate", "Voucher date", "date")}
           {field("payee", "Payee")}

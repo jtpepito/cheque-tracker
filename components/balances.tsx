@@ -38,6 +38,7 @@ function BalanceRow({ c, names, onChanged }: { c: CompanyProjection; names: Comp
             <span className="font-mono font-semibold">{peso(c.balance)}</span>{" "}
             <span className={c.stale ? "font-medium text-danger" : "text-muted"}>
               entered {manilaTime(c.updatedAt!)}
+              {c.updatedBy ? ` by ${c.updatedBy}` : ""}
               {c.stale ? " · more than 3 days old, check the bank" : ""}
             </span>
           </p>

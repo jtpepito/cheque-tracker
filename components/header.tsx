@@ -6,7 +6,9 @@ import { useState } from "react";
 import { logout } from "@/app/login/actions";
 import { api, ApiError } from "@/lib/api";
 import type { CompanyNames } from "@/lib/types";
+import type { SessionUser } from "@/lib/users";
 import type { CompanyDetails } from "@/lib/vouchers";
+import { ChangePassword } from "./change-password";
 import logo from "@/public/logo.png";
 
 const KEYS = ["wwj", "wythlae", "wwjcorp"] as const;
@@ -28,10 +30,12 @@ function toggleTheme() {
 type Draft = { names: CompanyNames; details: CompanyDetails };
 
 export function Header({
+  me,
   names,
   details,
   onChanged,
 }: {
+  me: SessionUser;
   names: CompanyNames;
   details: CompanyDetails;
   onChanged: () => Promise<void>;
@@ -64,6 +68,12 @@ export function Header({
       <div className="flex flex-wrap items-center gap-2">
         <Image src={logo} alt="Wythlae" width={48} height={48} priority className="h-12 w-12 shrink-0 rounded-full" />
         <h1 className="mr-auto text-2xl font-semibold">Cheque Funding Tracker</h1>
+        <span className="text-sm text-muted">{me.name}</span>
+        {me.role === "owner" && (
+          <Link href="/users" className="btn">
+            Users
+          </Link>
+        )}
         <Link href="/vouchers" className="btn">
           Vouchers
         </Link>
@@ -75,6 +85,7 @@ export function Header({
             Sign out
           </button>
         </form>
+        {me.id !== "shared" && <ChangePassword />}
       </div>
       {draft ? (
         <form onSubmit={save} className="space-y-3 rounded-xl border border-line bg-card p-4 text-sm">
