@@ -195,6 +195,9 @@ function moneyField(v: unknown): number | null | undefined {
   return n === null || n < 0 ? undefined : n;
 }
 
+/** More lines than any real voucher carries; keeps one request from writing without end. */
+export const MAX_VOUCHER_LINES = 200;
+
 export function validateVoucherInput(raw: unknown): { ok: true; value: VoucherInput } | { ok: false; errors: Record<string, string> } {
   const errors: Record<string, string> = {};
   if (!raw || typeof raw !== "object") return { ok: false, errors: { form: "The request was not understood." } };
@@ -203,8 +206,9 @@ export function validateVoucherInput(raw: unknown): { ok: true; value: VoucherIn
   const amount = parseAmount(r.amount);
   if (amount === null) errors.amount = "Enter an amount above zero.";
   if (!Array.isArray(r.lines)) errors.lines = "The lines were not understood.";
+  else if (r.lines.length > MAX_VOUCHER_LINES) errors.lines = `At most ${MAX_VOUCHER_LINES} lines on a voucher.`;
   const lines: VoucherInput["lines"] = [];
-  for (const [i, item] of (Array.isArray(r.lines) ? r.lines : []).entries()) {
+  for (const [i, item] of (Array.isArray(r.lines) && r.lines.length <= MAX_VOUCHER_LINES ? r.lines : []).entries()) {
     const l = (item && typeof item === "object" ? item : {}) as Record<string, unknown>;
     const money = { gross: moneyField(l.gross), ewt: moneyField(l.ewt), net: moneyField(l.net) };
     for (const [key, value] of Object.entries(money)) if (value === undefined) errors[`lines.${i}.${key}`] = "Enter an amount, or leave it blank.";

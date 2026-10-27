@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { checkPasswordHash } from "@/lib/passwords";
 import type { Sql } from "@/lib/sql";
 import {
-  changeOwnPassword, countActiveOwners, createUser, findByUsername, getUser, listUsers, resetPassword,
+  changeOwnPassword, countActiveOwners, createUser, endSessions, findByUsername, getUser, listUsers, resetPassword,
   setUserActive, setUserRole, UserError,
 } from "@/lib/users";
 import { resetDb, testSql } from "./db";
@@ -98,11 +98,18 @@ describe("passwords", () => {
     expect(checkPasswordHash("new-sample-pass", (await findByUsername(sql, "ben"))!.passwordHash)).toBe(true);
     expect(await codeOf(resetPassword(sql, b.id, "short"))).toBe("invalid");
   });
-  it("a person changes their own password with the current one, keeping their session", async () => {
+  it("a person changes their own password with the current one; every session ends and the new version comes back", async () => {
     const b = await createUser(sql, ben);
-    await changeOwnPassword(sql, b.id, "sample-pass-2", "another-sample");
-    expect((await getUser(sql, b.id))!.sessionVersion).toBe(1);
+    expect(await changeOwnPassword(sql, b.id, "sample-pass-2", "another-sample")).toBe(2);
+    expect((await getUser(sql, b.id))!.sessionVersion).toBe(2);
     expect(checkPasswordHash("another-sample", (await findByUsername(sql, "ben"))!.passwordHash)).toBe(true);
     expect(await codeOf(changeOwnPassword(sql, b.id, "wrong", "another-sample-2"))).toBe("invalid");
+    expect((await getUser(sql, b.id))!.sessionVersion).toBe(2);
+  });
+  it("signing out ends every session the person has", async () => {
+    const b = await createUser(sql, ben);
+    await endSessions(sql, b.id);
+    expect((await getUser(sql, b.id))!.sessionVersion).toBe(2);
+    await endSessions(sql, "no-such-user");
   });
 });

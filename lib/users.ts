@@ -141,8 +141,17 @@ export async function resetPassword(sql: Sql, id: string, password: unknown, now
   return (await getUser(sql, id))!;
 }
 
-/** By the person themselves, proving the current password. Their session stays valid. */
-export async function changeOwnPassword(sql: Sql, id: string, current: unknown, next: unknown, now: number = Date.now()): Promise<void> {
+/** Ends every session the person has (sign-out everywhere). Their next request must sign in again. */
+export async function endSessions(sql: Sql, id: string): Promise<void> {
+  await sql.query("UPDATE users SET session_version = session_version + 1 WHERE id = $1", [id]);
+}
+
+/**
+ * By the person themselves, proving the current password. Every session they have ends, so a
+ * cookie copied from another machine stops working; the caller re-issues the current one with
+ * the version returned.
+ */
+export async function changeOwnPassword(sql: Sql, id: string, current: unknown, next: unknown, now: number = Date.now()): Promise<number> {
   const problem = passwordProblem(next);
   if (problem) throw new UserError("invalid", problem);
   const row = (await sql.query<Row>("SELECT password_hash FROM users WHERE id = $1 AND active", [id]))[0];
@@ -150,5 +159,9 @@ export async function changeOwnPassword(sql: Sql, id: string, current: unknown, 
   if (typeof current !== "string" || !checkPasswordHash(current, row.password_hash as string)) {
     throw new UserError("invalid", "Current password: that is not your current password.");
   }
-  await sql.query("UPDATE users SET password_hash = $2, updated_at = $3 WHERE id = $1", [id, hashPassword(next as string), now]);
+  const rows = await sql.query<{ session_version: unknown }>(
+    "UPDATE users SET password_hash = $2, session_version = session_version + 1, updated_at = $3 WHERE id = $1 RETURNING session_version",
+    [id, hashPassword(next as string), now],
+  );
+  return Number(rows[0].session_version);
 }

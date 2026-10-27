@@ -31,8 +31,16 @@ describe("pgConfig", () => {
     });
   });
 
-  it("still encrypts, without verifying, when no certificate is supplied", () => {
-    expect(pgConfig(URL_PLAIN).ssl).toEqual({ rejectUnauthorized: false });
-    expect(pgConfig(URL_PLAIN, "  ").ssl).toEqual({ rejectUnauthorized: false });
+  it("still encrypts, without verifying, when no certificate is supplied outside production", () => {
+    expect(pgConfig(URL_PLAIN, undefined, false).ssl).toEqual({ rejectUnauthorized: false });
+    expect(pgConfig(URL_PLAIN, "  ", false).ssl).toEqual({ rejectUnauthorized: false });
+  });
+
+  it("refuses to connect unverified in production", () => {
+    expect(() => pgConfig(URL_PLAIN, undefined, true)).toThrow("DATABASE_CA_CERT");
+    expect(() => pgConfig(URL_PLAIN, "  ", true)).toThrow("DATABASE_CA_CERT");
+    expect(pgConfig(URL_PLAIN, "-----BEGIN CERTIFICATE-----\nabc\n-----END CERTIFICATE-----", true).ssl).toMatchObject({
+      rejectUnauthorized: true,
+    });
   });
 });

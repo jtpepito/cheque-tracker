@@ -74,6 +74,21 @@ export const MAX_REMOVALS = 20;
 
 const COMPANY_KEYS = ["wwj", "wythlae", "wwjcorp"] as const;
 
+/** Far above the sheet's size; keeps one request from holding the sync lock without end. */
+export const MAX_SYNC_ROWS = 5_000;
+export const MAX_INVOICE_ROWS = 20_000;
+
+/** Why a parsed payload is still too big to apply, or null. */
+export function payloadTooLarge(p: SyncPayload): string | null {
+  if (p.rows.length > MAX_SYNC_ROWS) return `The sync has ${p.rows.length} rows; at most ${MAX_SYNC_ROWS.toLocaleString("en-US")} are accepted.`;
+  for (const list of Object.values(p.invoices ?? {})) {
+    if (list.length > MAX_INVOICE_ROWS) {
+      return `An SI tab has ${list.length} rows; at most ${MAX_INVOICE_ROWS.toLocaleString("en-US")} are accepted.`;
+    }
+  }
+  return null;
+}
+
 export function parsePayload(body: unknown): SyncPayload | null {
   if (!body || typeof body !== "object" || Array.isArray(body)) return null;
   const b = body as Record<string, unknown>;

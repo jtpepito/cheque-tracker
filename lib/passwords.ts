@@ -1,23 +1,30 @@
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 
-// Passwords are stored as scrypt hashes with a random salt: "scrypt$<salt hex>$<hash hex>".
+// Passwords are stored as scrypt hashes with a random salt: "scrypt$<N>$<salt hex>$<hash hex>".
+// Hashes made before the work factor was recorded ("scrypt$<salt>$<hash>") used N = 16384.
 
-const PARAMS = { N: 16384, r: 8, p: 1 };
+const N = 65536; // 2^16, about 64 MB and a few hundred milliseconds per check
+const R = 8;
+const P = 1;
+const LEGACY_N = 16384;
 const KEY_BYTES = 64;
+const derive = (password: string, salt: Buffer, n: number) =>
+  scryptSync(password, salt, KEY_BYTES, { N: n, r: R, p: P, maxmem: 256 * n * R });
 
 export function hashPassword(password: string): string {
   const salt = randomBytes(16);
-  const hash = scryptSync(password, salt, KEY_BYTES, PARAMS);
-  return `scrypt$${salt.toString("hex")}$${hash.toString("hex")}`;
+  return `scrypt$${N}$${salt.toString("hex")}$${derive(password, salt, N).toString("hex")}`;
 }
 
 export function checkPasswordHash(password: string, stored: string): boolean {
-  const [kind, saltHex, hashHex] = stored.split("$");
-  if (kind !== "scrypt" || !saltHex || !hashHex) return false;
+  const parts = stored.split("$");
+  if (parts[0] !== "scrypt" || (parts.length !== 3 && parts.length !== 4)) return false;
+  const n = parts.length === 4 ? Number(parts[1]) : LEGACY_N;
+  const [saltHex, hashHex] = parts.slice(-2);
+  if (!Number.isInteger(n) || n < 1024 || n > 1 << 20 || (n & (n - 1)) !== 0 || !saltHex || !hashHex) return false;
   const expected = Buffer.from(hashHex, "hex");
   if (expected.length !== KEY_BYTES) return false;
-  const hash = scryptSync(password, Buffer.from(saltHex, "hex"), KEY_BYTES, PARAMS);
-  return timingSafeEqual(hash, expected);
+  return timingSafeEqual(derive(password, Buffer.from(saltHex, "hex"), n), expected);
 }
 
 export function normalizeUsername(raw: unknown): string {

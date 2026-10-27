@@ -103,6 +103,13 @@ describe("saving a voucher", () => {
 });
 
 describe("validateVoucherInput", () => {
+  it("caps the number of lines", () => {
+    const lines = Array.from({ length: 201 }, () => ({}));
+    const r = validateVoucherInput({ voucherDate: "2026-10-27", amount: "1", lines });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.errors.lines).toBe("At most 200 lines on a voucher.");
+    expect(validateVoucherInput({ voucherDate: "2026-10-27", amount: "1", lines: lines.slice(0, 200) }).ok).toBe(true);
+  });
   const good = {
     voucherDate: "2026-10-28", payee: " Sample ", amount: "75,079.61", preparedBy: "A", checkedBy: "", approvedBy: "", receivedBy: "", notes: "",
     lines: [{ invoiceNo: " 1 ", invoiceDate: "2026-01-07", description: "Flour", gross: "65,280", ewt: "", net: 64697.14 }],

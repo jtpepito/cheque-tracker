@@ -5,16 +5,23 @@ import type { PoolConfig } from "pg";
  * - sslmode is removed from the connection string: pg lets the string override the ssl option
  *   below, and "sslmode=require" would then demand a certificate chain Node does not trust.
  * - With Supabase's CA certificate (DATABASE_CA_CERT) the server is verified. Without it the
- *   connection is still encrypted but the server is not verified.
+ *   connection is still encrypted but the server is not verified, which production refuses.
  * - Timeouts make an unreachable database fail in seconds, not hang until the host kills the request.
  */
-export function pgConfig(url: string, caCert?: string): PoolConfig {
+export function pgConfig(
+  url: string,
+  caCert?: string,
+  production: boolean = !!process.env.VERCEL || process.env.NODE_ENV === "production",
+): PoolConfig {
   const [base, query = ""] = url.split("?");
   const kept = query
     .split("&")
     .filter((part) => part && !part.toLowerCase().startsWith("sslmode="))
     .join("&");
   const ca = caCert?.trim().replace(/\\n/g, "\n");
+  if (production && !ca) {
+    throw new Error("DATABASE_CA_CERT is not set. Production will not talk to the database without verifying it.");
+  }
   return {
     connectionString: kept ? `${base}?${kept}` : base,
     max: 3,

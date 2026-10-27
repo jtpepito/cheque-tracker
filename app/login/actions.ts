@@ -6,8 +6,9 @@ import { cookieSecure } from "@/lib/auth";
 import { getSql } from "@/lib/db";
 import { signIn } from "@/lib/login";
 import { allowAttempt, clearAttempts } from "@/lib/login-throttle";
-import { createSessionToken, SESSION_COOKIE, SESSION_TTL_SECONDS } from "@/lib/session";
+import { createSessionToken, SESSION_COOKIE, SESSION_TTL_SECONDS, verifySessionToken } from "@/lib/session";
 import { normalizeUsername } from "@/lib/passwords";
+import { endSessions, SHARED_OWNER } from "@/lib/users";
 
 export type LoginState = { error?: string };
 
@@ -19,14 +20,16 @@ export async function login(_prev: LoginState, fd: FormData): Promise<LoginState
   let outcome: Awaited<ReturnType<typeof signIn>>;
   try {
     const sql = await getSql();
-    // At most ten attempts in 15 minutes per address and per username, counted before the
-    // password is looked at, so a burst sent at once cannot slip past.
-    const allowed = (await allowAttempt(sql, `ip:${ip}`)) && (await allowAttempt(sql, `user:${username}`));
+    // At most ten attempts in 15 minutes per address, and per username from that address,
+    // counted before the password is looked at, so a burst sent at once cannot slip past. The
+    // username bucket is tied to the address so a stranger cannot lock someone else out.
+    const userKey = `user:${ip}:${username}`;
+    const allowed = (await allowAttempt(sql, `ip:${ip}`)) && (await allowAttempt(sql, userKey));
     if (!allowed) return { error: "Too many wrong passwords. Try again in 15 minutes." };
     outcome = await signIn(sql, username, password);
     if (outcome.ok) {
       await clearAttempts(sql, `ip:${ip}`);
-      await clearAttempts(sql, `user:${username}`);
+      await clearAttempts(sql, userKey);
     }
   } catch (err) {
     console.error("[login] database error:", err instanceof Error ? err.message : err);
@@ -46,7 +49,17 @@ export async function login(_prev: LoginState, fd: FormData): Promise<LoginState
   redirect("/");
 }
 
+/** Signs the person out everywhere: the cookie goes, and the token it held stops verifying. */
 export async function logout() {
-  (await cookies()).delete(SESSION_COOKIE);
+  const jar = await cookies();
+  const token = await verifySessionToken(jar.get(SESSION_COOKIE)?.value);
+  if (token && token.userId !== SHARED_OWNER.id) {
+    try {
+      await endSessions(await getSql(), token.userId);
+    } catch (err) {
+      console.error("[logout] database error:", err instanceof Error ? err.message : err);
+    }
+  }
+  jar.delete(SESSION_COOKIE);
   redirect("/login");
 }

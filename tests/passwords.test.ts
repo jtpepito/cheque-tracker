@@ -1,3 +1,4 @@
+import { scryptSync } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { checkPasswordHash, hashPassword, normalizeUsername, passwordProblem, usernameProblem } from "@/lib/passwords";
 
@@ -9,6 +10,15 @@ describe("password hashing", () => {
     expect(checkPasswordHash("correct horse batter", stored)).toBe(false);
     expect(checkPasswordHash("correct horse battery", "nonsense")).toBe(false);
     expect(checkPasswordHash("correct horse battery", "")).toBe(false);
+  });
+  it("records the work factor in the hash and still checks hashes made with the earlier one", () => {
+    expect(hashPassword("sample-pass-1").split("$")).toHaveLength(4);
+    expect(hashPassword("sample-pass-1").split("$")[1]).toBe("65536");
+    const salt = Buffer.from("0123456789abcdef0123456789abcdef", "hex");
+    const legacy = `scrypt$${salt.toString("hex")}$${scryptSync("sample-pass-1", salt, 64, { N: 16384, r: 8, p: 1 }).toString("hex")}`;
+    expect(checkPasswordHash("sample-pass-1", legacy)).toBe(true);
+    expect(checkPasswordHash("sample-pass-2", legacy)).toBe(false);
+    expect(checkPasswordHash("sample-pass-1", "scrypt$notanumber$00$00")).toBe(false);
   });
   it("salts, so the same password hashes differently each time", () => {
     expect(hashPassword("same")).not.toBe(hashPassword("same"));

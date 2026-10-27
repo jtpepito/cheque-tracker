@@ -33,7 +33,8 @@ A push to `main` on GitHub deploys to production (the repo is connected to the V
 `DATABASE_URL` must use Supabase's **shared pooler** host (`aws-0-ap-southeast-1.pooler.supabase.com`, user
 `postgres.<project ref>`). The `db.<ref>.supabase.co` host is IPv6-only and Vercel cannot reach it.
 
-Secrets are set in Vercel (Production): `SESSION_SECRET` (required; sessions never fall back to another key), `SYNC_KEY`, `DATABASE_URL`, `DATABASE_CA_CERT`, and `ADMIN_PASSWORD` until the first Owner account exists.
+Secrets are set in Vercel (Production): `SESSION_SECRET` (required; sessions never fall back to another key), `SYNC_KEY`, `DATABASE_URL`, `DATABASE_CA_CERT` (required in production: the app refuses an unverified database connection), and `ADMIN_PASSWORD` until the first Owner account exists.
+Every response carries a Content-Security-Policy (scripts need the per-request nonce the middleware issues), nosniff, DENY framing, a referrer policy and a permissions policy; see `lib/csp.ts`.
 `DATABASE_URL` is the Supabase **transaction pooler** string (port 6543). For the two commands below it
 is also kept in `.env.production.local` on this PC, which is git-ignored.
 
@@ -113,6 +114,7 @@ their own password from the header. The app refuses to deactivate or demote the 
 Until an Owner account exists, the shared password (`ADMIN_PASSWORD`) signs in as username `owner`.
 Creating the first Owner account ends that session at once: sign in again as yourself. After that the
 shared password is refused and `ADMIN_PASSWORD` can be removed from Vercel (keep `SESSION_SECRET`).
-Deactivating a person or resetting their password ends their current sessions on their next request.
+Deactivating a person, resetting their password, their own password change, or signing out ends every session
+they have (on every device) at their next request.
 Ten wrong sign-in attempts in 15 minutes, per address or per username, lock that address or username out
 for 15 minutes. Balances, company choices and vouchers record the name of the person who made them.

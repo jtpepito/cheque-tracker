@@ -3,7 +3,9 @@ import type { Sql } from "@/lib/sql";
 import { resetDb, testSql } from "./db";
 import { listCheques, setCompany, upsertCheque } from "@/lib/cheques";
 import type { SheetRow } from "@/lib/sheet-rows";
-import { applySync, getLastCheck, getLastRefusal, getLastSync, parsePayload, recordRefusal, SyncRefused, type SyncPayload } from "@/lib/sync";
+import {
+  applySync, getLastCheck, getLastRefusal, getLastSync, parsePayload, payloadTooLarge, recordRefusal, SyncRefused, type SyncPayload,
+} from "@/lib/sync";
 import { cheque } from "./helpers";
 
 const sheetRow = (n: number, over: SheetRow = {}): SheetRow => ({
@@ -154,6 +156,17 @@ describe("applySync", () => {
     expect((await getLastSync(sql))).toBeNull();
     const report = await applySync(sql, payload([sheetRow(2), sheetRow(3, { amount: "abc" })]), 5000);
     expect((await getLastSync(sql))).toEqual(report);
+  });
+});
+
+describe("payloadTooLarge", () => {
+  it("refuses more rows or invoice rows than a sheet can reasonably hold", () => {
+    const rows = (n: number) => Array.from({ length: n }, () => ({})) as SheetRow[];
+    expect(payloadTooLarge({ dryRun: false, allowRemovals: false, rows: rows(5000), siRefs: {} })).toBeNull();
+    expect(payloadTooLarge({ dryRun: false, allowRemovals: false, rows: rows(5001), siRefs: {} })).toContain("5,000");
+    const inv = (n: number) => Array.from({ length: n }, () => ({}));
+    expect(payloadTooLarge({ dryRun: false, allowRemovals: false, rows: [], siRefs: {}, invoices: { wwj: inv(20000) } })).toBeNull();
+    expect(payloadTooLarge({ dryRun: false, allowRemovals: false, rows: [], siRefs: {}, invoices: { wwj: inv(20001) } })).toContain("20,000");
   });
 });
 

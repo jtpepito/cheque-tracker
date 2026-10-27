@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSql } from "@/lib/db";
-import { applySync, parsePayload, recordRefusal, SyncRefused } from "@/lib/sync";
+import { applySync, parsePayload, payloadTooLarge, recordRefusal, SyncRefused } from "@/lib/sync";
 import { checkSyncKey } from "@/lib/sync-key";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +24,8 @@ export async function POST(req: Request) {
   }
   const payload = parsePayload(body);
   if (!payload) return refuse(400, "The sync was not understood.");
+  const tooLarge = payloadTooLarge(payload);
+  if (tooLarge) return refuse(400, tooLarge);
 
   try {
     return NextResponse.json(await applySync(await getSql(), payload));
