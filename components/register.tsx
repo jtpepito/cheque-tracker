@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { clearingDate, type Holiday } from "@/lib/banking";
@@ -8,19 +9,23 @@ import { peso } from "@/lib/money";
 import { DEFAULT_FILTERS, filterAndSort, issuedSummary, unassignedSummary, type Filters } from "@/lib/register";
 import { COMPANIES, STATUSES, companyLabel, type Cheque, type Company, type CompanyNames } from "@/lib/types";
 
-const GRID = "md:grid md:grid-cols-[7rem_11rem_8rem_minmax(0,1fr)_8rem_5rem] md:items-center md:gap-3";
+const GRID = "md:grid md:grid-cols-[7rem_11rem_8rem_minmax(0,1fr)_8rem_5rem_7rem] md:items-center md:gap-3";
 
 export function Register({
   cheques,
   names,
   holidays,
+  vouchers,
   onChanged,
 }: {
   cheques: Cheque[];
   names: CompanyNames;
   holidays: Holiday[];
+  /** cheque id → voucher id, for the Voucher buttons. */
+  vouchers: Record<string, string>;
   onChanged: () => Promise<void>;
 }) {
+  const router = useRouter();
   const holidayDates = new Set(holidays.map((h) => h.date));
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [busy, setBusy] = useState<string | null>(null);
@@ -29,6 +34,23 @@ export function Register({
   const rows = filterAndSort(cheques, filters);
   const issued = issuedSummary(cheques);
   const unassigned = unassignedSummary(cheques);
+
+  /** Opens the cheque's voucher, making it first if there is none. */
+  async function openVoucher(c: Cheque) {
+    const existing = vouchers[c.id];
+    if (existing) return router.push(`/vouchers/${existing}`);
+    setBusy(c.id);
+    setRowError(null);
+    try {
+      const v = await api<{ id: string }>("/api/vouchers", "POST", { chequeId: c.id });
+      router.push(`/vouchers/${v.id}`);
+      return;
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : "Something went wrong. Try again.";
+      setRowError(`Cheque ${c.chequeNo || "(no number)"}, ${c.payee}: ${message}`);
+    }
+    setBusy(null);
+  }
 
   async function setCompany(c: Cheque, company: Company) {
     setBusy(c.id);
@@ -120,6 +142,7 @@ export function Register({
         <span>Payee</span>
         <span className="text-right">Amount</span>
         <span>Status</span>
+        <span>Voucher</span>
       </div>
       {rows.length === 0 ? (
         <p className="rounded-lg border border-line bg-card p-4 text-sm text-muted">No cheques match these filters.</p>
@@ -170,6 +193,15 @@ export function Register({
               </div>
               <p className="font-mono md:text-right">{c.amount === null ? "—" : peso(c.amount)}</p>
               <p className="capitalize">{c.status}</p>
+              <button
+                type="button"
+                className="btn"
+                disabled={busy === c.id || c.company === "unassigned"}
+                title={c.company === "unassigned" ? "Choose a company first" : undefined}
+                onClick={() => openVoucher(c)}
+              >
+                {vouchers[c.id] ? "Voucher" : "Make voucher"}
+              </button>
             </li>
           ))}
         </ul>

@@ -7,6 +7,7 @@ import { buildCalendar } from "@/lib/calendar";
 import { latestOnly } from "@/lib/latest";
 import { buildProjection, type Balance } from "@/lib/projection";
 import type { SyncRefusal, SyncReport } from "@/lib/sync";
+import type { CompanyDetails } from "@/lib/vouchers";
 import type { Cheque, CompanyNames } from "@/lib/types";
 import { Balances } from "./balances";
 import { FundingCalendar } from "./funding-calendar";
@@ -22,6 +23,8 @@ type State = {
   holidays: Holiday[];
   sync: SyncReport | null;
   refusal: SyncRefusal | null;
+  vouchers: Record<string, string>;
+  companyDetails: CompanyDetails;
   balances: Balance[];
   cheques: Cheque[];
 };
@@ -65,7 +68,7 @@ export function Tracker() {
 
   return (
     <main className="mx-auto max-w-6xl space-y-8 p-4 sm:p-6">
-      <Header names={state.companies} onChanged={refresh} />
+      <Header names={state.companies} details={state.companyDetails} onChanged={refresh} />
       {problem && (
         <p role="alert" className="rounded-lg bg-warn p-3 text-sm text-warn-ink">
           {problem} Showing the last data loaded; trying again shortly.
@@ -78,7 +81,13 @@ export function Tracker() {
         names={state.companies}
       />
       <Balances projection={projection} names={state.companies} onChanged={refresh} />
-      <Register cheques={state.cheques} names={state.companies} holidays={state.holidays} onChanged={refresh} />
+      <Register
+        cheques={state.cheques}
+        names={state.companies}
+        holidays={state.holidays}
+        vouchers={state.vouchers}
+        onChanged={refresh}
+      />
       <Holidays holidays={state.holidays} today={state.today} onChanged={refresh} />
     </main>
   );

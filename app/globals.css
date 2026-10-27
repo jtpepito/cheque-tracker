@@ -82,3 +82,23 @@ button {
 .btn-primary {
   @apply border-accent bg-accent text-accent-ink;
 }
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 14mm;
+  }
+  body {
+    background: #fff;
+    color: #000;
+  }
+  .print-hide {
+    display: none !important;
+  }
+  .voucher-sheet {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    max-width: none !important;
+  }
+}

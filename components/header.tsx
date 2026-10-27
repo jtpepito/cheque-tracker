@@ -1,10 +1,12 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useState } from "react";
 import { logout } from "@/app/login/actions";
 import { api, ApiError } from "@/lib/api";
 import type { CompanyNames } from "@/lib/types";
+import type { CompanyDetails } from "@/lib/vouchers";
 import logo from "@/public/logo.png";
 
 const KEYS = ["wwj", "wythlae", "wwjcorp"] as const;
@@ -23,8 +25,18 @@ function toggleTheme() {
   }
 }
 
-export function Header({ names, onChanged }: { names: CompanyNames; onChanged: () => Promise<void> }) {
-  const [draft, setDraft] = useState<CompanyNames | null>(null);
+type Draft = { names: CompanyNames; details: CompanyDetails };
+
+export function Header({
+  names,
+  details,
+  onChanged,
+}: {
+  names: CompanyNames;
+  details: CompanyDetails;
+  onChanged: () => Promise<void>;
+}) {
+  const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -34,7 +46,8 @@ export function Header({ names, onChanged }: { names: CompanyNames; onChanged: (
     setSaving(true);
     setError(null);
     try {
-      await api<CompanyNames>("/api/companies", "PUT", draft);
+      await api<CompanyNames>("/api/companies", "PUT", draft.names);
+      await api<CompanyDetails>("/api/company-details", "PUT", draft.details);
       await onChanged();
       setDraft(null);
     } catch (err) {
@@ -43,11 +56,17 @@ export function Header({ names, onChanged }: { names: CompanyNames; onChanged: (
     setSaving(false);
   }
 
+  const setDetail = (key: (typeof KEYS)[number], field: "address" | "tin", value: string) =>
+    setDraft((d) => d && { ...d, details: { ...d.details, [key]: { ...d.details[key], [field]: value } } });
+
   return (
     <header className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <Image src={logo} alt="Wythlae" width={48} height={48} priority className="h-12 w-12 shrink-0 rounded-full" />
         <h1 className="mr-auto text-2xl font-semibold">Cheque Funding Tracker</h1>
+        <Link href="/vouchers" className="btn">
+          Vouchers
+        </Link>
         <button type="button" className="btn" onClick={toggleTheme}>
           Light / dark
         </button>
@@ -58,30 +77,43 @@ export function Header({ names, onChanged }: { names: CompanyNames; onChanged: (
         </form>
       </div>
       {draft ? (
-        <form onSubmit={save} className="flex flex-wrap items-end gap-2">
+        <form onSubmit={save} className="space-y-3 rounded-xl border border-line bg-card p-4 text-sm">
+          <p className="text-muted">The name shows everywhere; the address and TIN print on that company&apos;s vouchers.</p>
           {KEYS.map((key) => (
-            <label key={key} className="space-y-1 text-sm">
-              <span className="block text-muted">Company name</span>
-              <input
-                className="field"
-                required
-                maxLength={60}
-                value={draft[key]}
-                onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
-              />
-            </label>
+            <div key={key} className="grid gap-2 sm:grid-cols-[1fr_2fr_1fr]">
+              <label className="space-y-1">
+                <span className="block text-muted">Company name</span>
+                <input
+                  className="field"
+                  required
+                  maxLength={60}
+                  value={draft.names[key]}
+                  onChange={(e) => setDraft({ ...draft, names: { ...draft.names, [key]: e.target.value } })}
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="block text-muted">Address</span>
+                <input className="field" maxLength={300} value={draft.details[key].address} onChange={(e) => setDetail(key, "address", e.target.value)} />
+              </label>
+              <label className="space-y-1">
+                <span className="block text-muted">TIN</span>
+                <input className="field" maxLength={40} value={draft.details[key].tin} onChange={(e) => setDetail(key, "tin", e.target.value)} />
+              </label>
+            </div>
           ))}
-          <button type="submit" className="btn btn-primary h-10" disabled={saving}>
-            {saving ? "Saving…" : "Save names"}
-          </button>
-          <button type="button" className="btn h-10" onClick={() => setDraft(null)}>
-            Cancel
-          </button>
-          {error && (
-            <p role="alert" className="w-full text-sm text-danger">
-              {error}
-            </p>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="submit" className="btn btn-primary h-10" disabled={saving}>
+              {saving ? "Saving…" : "Save"}
+            </button>
+            <button type="button" className="btn h-10" onClick={() => setDraft(null)}>
+              Cancel
+            </button>
+            {error && (
+              <p role="alert" className="text-danger">
+                {error}
+              </p>
+            )}
+          </div>
         </form>
       ) : (
         <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -90,7 +122,7 @@ export function Header({ names, onChanged }: { names: CompanyNames; onChanged: (
               {names[key]}
             </span>
           ))}
-          <button type="button" className="btn" onClick={() => setDraft(names)}>
+          <button type="button" className="btn" onClick={() => setDraft({ names, details })}>
             Edit names
           </button>
         </div>
