@@ -26,7 +26,7 @@ export function FundingCalendar({
       </h2>
 
       {messages.alerts.length > 0 && (
-        <div role="alert" className="rounded-lg border-2 border-danger p-3 text-sm">
+        <div role="alert" className="rounded-lg border-2 border-accent p-3 text-sm">
           <p className="font-semibold text-danger">Not enough in the bank:</p>
           <ul className="mt-1 space-y-1">
             {messages.alerts.map((text) => (
@@ -74,7 +74,7 @@ export function FundingCalendar({
             key={d.date}
             className={`rounded-lg border p-3 ${
               shortDates.has(d.date)
-                ? "border-2 border-danger bg-card"
+                ? "border-2 border-accent bg-card"
                 : d.soon && d.total > 0
                   ? "border-warn-ink bg-warn text-warn-ink"
                   : "border-line bg-card"
