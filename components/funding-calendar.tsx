@@ -79,7 +79,7 @@ export function FundingCalendar({
         {days.map((d, i) => (
           <li
             key={d.date}
-            className={`rounded-lg border p-3 ${
+            className={`min-w-0 rounded-lg border p-3 ${
               shortDates.has(d.date)
                 ? "border-2 border-accent bg-card"
                 : d.soon && d.total > 0
@@ -91,7 +91,7 @@ export function FundingCalendar({
             {d.closed ? (
               <p className="mt-1 text-xs text-muted">No clearing · {d.closed}</p>
             ) : (
-              <p className={`mt-1 font-mono text-sm font-semibold ${d.total === 0 ? "opacity-50" : ""}`}>
+              <p className={`mt-1 font-mono text-sm font-semibold [overflow-wrap:anywhere] ${d.total === 0 ? "opacity-50" : ""}`}>
                 {peso(d.total)}
               </p>
             )}
@@ -105,13 +105,13 @@ export function FundingCalendar({
                   {d.items
                     .filter((item) => item.company === s.company)
                     .map((item, n) => (
-                      <span key={n} className="flex justify-between gap-x-2 pl-2 text-muted" title={item.payee}>
-                        <span className="font-mono">{item.chequeNo || "(no number)"}</span>
-                        <span className="font-mono">{item.amount === null ? "—" : peso(item.amount)}</span>
+                      <span key={n} className="flex flex-wrap justify-between gap-x-2 pl-2 text-muted" title={item.payee}>
+                        <span className="min-w-0 font-mono [overflow-wrap:anywhere]">{item.chequeNo || "(no number)"}</span>
+                        <span className="ml-auto font-mono">{item.amount === null ? "—" : peso(item.amount)}</span>
                       </span>
                     ))}
                   {s.end !== null && (
-                    <span className={`block text-right font-mono ${s.end < 0 ? "font-semibold text-danger" : "opacity-70"}`}>
+                    <span className={`block text-right font-mono [overflow-wrap:anywhere] ${s.end < 0 ? "font-semibold text-danger" : "opacity-70"}`}>
                       {s.end < 0 ? `short ${peso(-s.end)}` : `left ${peso(s.end)}`}
                     </span>
                   )}
