@@ -254,28 +254,31 @@ export function VoucherEditor({ id }: { id: string }) {
       </section>
 
       {/* The printed voucher. Shows the draft, so what you see is what prints. */}
-      <section className="voucher-sheet mx-auto max-w-[192mm] space-y-3 rounded-xl border border-line bg-white p-8 text-sm text-black">
+      <section className="voucher-sheet mx-auto max-w-[196mm] space-y-2 rounded-xl border border-line bg-white p-6 text-xs text-black">
         <header className="text-center">
-          <p className="text-lg font-semibold">{view.companyName}</p>
-          {view.details.address && <p>{view.details.address}</p>}
-          {view.details.tin && <p>TIN {view.details.tin}</p>}
-          <p className="mt-2 text-base font-semibold tracking-wide">CHECK VOUCHER</p>
+          <p className="text-base font-semibold">{view.companyName}</p>
+          {(view.details.address || view.details.tin) && (
+            <p>{[view.details.address, view.details.tin && `TIN ${view.details.tin}`].filter(Boolean).join(" · ")}</p>
+          )}
+          <p className="mt-1 text-sm font-semibold tracking-wide">CHECK VOUCHER</p>
         </header>
-        <div className="flex justify-between">
+        <div className="flex justify-between gap-4">
           <p>
+            <span className="text-neutral-600">Pay to</span> <span className="font-semibold">{draft.payee}</span>
+          </p>
+          <p className="shrink-0">
             <span className="text-neutral-600">CV No.</span> <span className="font-mono font-semibold">{v.number}</span>
           </p>
+        </div>
+        <div className="flex justify-between gap-4">
           <p>
+            <span className="text-neutral-600">Amount</span> <span className="font-mono font-semibold">{peso(amount)}</span>
+          </p>
+          <p className="shrink-0">
             <span className="text-neutral-600">Date</span> {draft.voucherDate ? shortDate(draft.voucherDate) + " " + draft.voucherDate.slice(0, 4) : ""}
           </p>
         </div>
-        <p>
-          <span className="text-neutral-600">Pay to</span> <span className="font-semibold">{draft.payee}</span>
-        </p>
-        <p>
-          <span className="text-neutral-600">Amount</span> <span className="font-mono font-semibold">{peso(amount)}</span>
-        </p>
-        <p className="text-xs uppercase">{amount > 0 && amount < 1e12 ? amountInWords(amount) : ""}</p>
+        <p className="text-[10px] uppercase">{amount > 0 && amount < 1e12 ? amountInWords(amount) : ""}</p>
         {cheque && (
           <p>
             <span className="text-neutral-600">Cheque no.</span> {cheque.chequeNo || "—"}
@@ -283,61 +286,61 @@ export function VoucherEditor({ id }: { id: string }) {
             {cheque.issueDate ? <> · dated {shortDate(cheque.issueDate)} {cheque.issueDate.slice(0, 4)}</> : null}
           </p>
         )}
-        <table className="w-full border-collapse text-xs">
+        <table className="w-full border-collapse text-[11px]">
           <thead>
             <tr className="border-b border-black text-left">
-              <th className="py-1 pr-2">Invoice no.</th>
-              <th className="py-1 pr-2">Date</th>
-              <th className="py-1 pr-2">Particulars</th>
-              <th className="py-1 pr-2 text-right">Gross</th>
-              <th className="py-1 pr-2 text-right">EWT</th>
-              <th className="py-1 text-right">Net</th>
+              <th className="py-0.5 pr-2">Invoice no.</th>
+              <th className="py-0.5 pr-2">Date</th>
+              <th className="py-0.5 pr-2">Particulars</th>
+              <th className="py-0.5 pr-2 text-right">Gross</th>
+              <th className="py-0.5 pr-2 text-right">EWT</th>
+              <th className="py-0.5 text-right">Net</th>
             </tr>
           </thead>
           <tbody>
             {draft.lines.map((l, i) => (
               <tr key={i} className="border-b border-neutral-300 align-top">
-                <td className="py-1 pr-2 font-mono">{l.invoiceNo}</td>
-                <td className="py-1 pr-2">{l.invoiceDate ? shortDate(l.invoiceDate) + " " + l.invoiceDate.slice(0, 4) : ""}</td>
-                <td className="py-1 pr-2">{l.description}</td>
-                <td className="py-1 pr-2 text-right font-mono">{asNumber(l.gross) === null ? "" : peso(asNumber(l.gross)!)}</td>
-                <td className="py-1 pr-2 text-right font-mono">{asNumber(l.ewt) === null ? "" : peso(asNumber(l.ewt)!)}</td>
-                <td className="py-1 text-right font-mono">{asNumber(l.net) === null ? "" : peso(asNumber(l.net)!)}</td>
+                <td className="py-0.5 pr-2 font-mono">{l.invoiceNo}</td>
+                <td className="py-0.5 pr-2">{l.invoiceDate ? shortDate(l.invoiceDate) + " " + l.invoiceDate.slice(0, 4) : ""}</td>
+                <td className="py-0.5 pr-2">{l.description}</td>
+                <td className="py-0.5 pr-2 text-right font-mono">{asNumber(l.gross) === null ? "" : peso(asNumber(l.gross)!)}</td>
+                <td className="py-0.5 pr-2 text-right font-mono">{asNumber(l.ewt) === null ? "" : peso(asNumber(l.ewt)!)}</td>
+                <td className="py-0.5 text-right font-mono">{asNumber(l.net) === null ? "" : peso(asNumber(l.net)!)}</td>
               </tr>
             ))}
             {draft.lines.length > 0 && (
               <tr className="font-semibold">
-                <td colSpan={5} className="py-1 pr-2 text-right">
+                <td colSpan={5} className="py-0.5 pr-2 text-right">
                   Total
                 </td>
-                <td className="py-1 text-right font-mono">{peso(netTotal)}</td>
+                <td className="py-0.5 text-right font-mono">{peso(netTotal)}</td>
               </tr>
             )}
           </tbody>
         </table>
         {draft.notes && <p className="whitespace-pre-wrap">{draft.notes}</p>}
         {/* Sits at the foot of the page: label, room to sign, then the name under the line. */}
-        <div className="voucher-footer space-y-6">
-          <div className="grid grid-cols-2 gap-x-6 gap-y-6 sm:grid-cols-4">
+        <div className="voucher-footer space-y-3 pt-2">
+          <div className="grid grid-cols-4 gap-x-4">
             {(["preparedBy", "checkedBy", "approvedBy", "receivedBy"] as const).map((key, i) => (
               <div key={key}>
-                <p className="text-xs text-neutral-600">{["Prepared by", "Checked by", "Approved by", "Received by"][i]}</p>
-                <div className="h-20" />
-                <p className="border-t border-black pt-1 text-center font-medium">{draft[key] || " "}</p>
-                <p className="text-center text-[10px] text-neutral-600">Signature over printed name / date</p>
+                <p className="text-neutral-600">{["Prepared by", "Checked by", "Approved by", "Received by"][i]}</p>
+                <div className="h-9" />
+                <p className="border-t border-black pt-0.5 text-center font-medium">{draft[key] || " "}</p>
+                <p className="text-center text-[9px] text-neutral-600">Signature over printed name / date</p>
               </div>
             ))}
           </div>
-          <div className="text-xs">
+          <div>
             <p>Received from {view.companyName} the amount of {peso(amount)} in full payment of the above.</p>
-            <div className="grid grid-cols-2 gap-x-6 pt-2">
+            <div className="grid grid-cols-2 gap-x-6">
               <div>
-                <div className="h-20" />
-                <p className="border-t border-black pt-1 text-center text-[10px] text-neutral-600">Payee: signature over printed name</p>
+                <div className="h-8" />
+                <p className="border-t border-black pt-0.5 text-center text-[9px] text-neutral-600">Payee: signature over printed name</p>
               </div>
               <div>
-                <div className="h-20" />
-                <p className="border-t border-black pt-1 text-center text-[10px] text-neutral-600">Date received</p>
+                <div className="h-8" />
+                <p className="border-t border-black pt-0.5 text-center text-[9px] text-neutral-600">Date received</p>
               </div>
             </div>
           </div>

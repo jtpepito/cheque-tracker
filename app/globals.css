@@ -91,7 +91,7 @@ button {
 @media print {
   @page {
     size: letter portrait;
-    margin: 12mm;
+    margin: 8mm 10mm;
   }
   body {
     background: #fff;
@@ -112,12 +112,12 @@ button {
   }
 }
 
-/* The voucher is laid out as one Letter page: 279.4mm less the 12mm margins, with some slack so
-   browser rounding never pushes the foot onto a second page. The signature block sits at the foot. */
+/* The voucher fills the top half of a Letter page, so the sheet can be cut in two: 139.7mm less
+   the 8mm top margin, with a little room left above the middle (about 4mm). The signature block sits at the foot. */
 .voucher-sheet {
   display: flex;
   flex-direction: column;
-  min-height: 236mm;
+  min-height: 128mm;
 }
 .voucher-footer {
   margin-top: auto;
