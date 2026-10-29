@@ -6,8 +6,9 @@
 
 const TAB = "Check Issuances";
 const SI_TABS = { wwj: ["WWJ SI"], wythlae: ["Wythlae SI"], wwjcorp: ["WWJ Corp SI"] };
+// A list gives the names a heading may carry; the first is the one named when none is found.
 const HEADERS = {
-  date: "Date",
+  date: ["Date", "Release Date", "Issue Date", "Date Released"],
   supplier: "Name of Supplier",
   chequeNo: "Check Number",
   amount: "Amount",
@@ -48,8 +49,18 @@ function findColumns_(sheet, wanted) {
   const header = headerRow_(sheet);
   const found = {};
   Object.keys(wanted).forEach(function (key) {
-    const index = header.indexOf(norm_(wanted[key]));
-    if (index < 0) throw new Error('The "' + sheet.getName() + '" tab has no "' + wanted[key] + '" column.');
+    const names = [].concat(wanted[key]);
+    let index = -1;
+    names.some(function (name) {
+      index = header.indexOf(norm_(name));
+      return index >= 0;
+    });
+    if (index < 0) {
+      throw new Error(
+        'The "' + sheet.getName() + '" tab has no "' + names.join('" or "') + '" column. Its headings are: ' +
+          header.filter(Boolean).join(" | "),
+      );
+    }
     found[key] = index;
   });
   return found;
