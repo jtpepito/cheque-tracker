@@ -6,6 +6,9 @@
 
 const TAB = "Check Issuances";
 const SI_TABS = { wwj: ["WWJ SI"], wythlae: ["Wythlae SI"], wwjcorp: ["WWJ Corp SI"] };
+// Delivery receipt tabs: read for voucher lines only, not for working out a cheque's company.
+// A DR tab that does not exist is skipped.
+const DR_TABS = { wwj: ["WWJ DR"], wythlae: ["Wythlae DR"], wwjcorp: ["WWJ CORP DR"] };
 // A list gives the names a heading may carry; the first is the one named when none is found.
 const HEADERS = {
   date: ["Date", "Release Date", "Issue Date", "Date Released"],
@@ -199,7 +202,10 @@ function findSiColumns_(sheet) {
   throw new Error('The "' + sheet.getName() + '" tab has no "Payment Details" heading in its first 5 rows.');
 }
 
-/** Each company's SI tab(s): the Payment Details text (for the company rules) and every row (for vouchers). */
+/**
+ * Each company's SI tab(s): the Payment Details text (for the company rules) and every row (for
+ * vouchers). The DR tabs add rows for vouchers only.
+ */
 function readSiTabs_() {
   const zone = SpreadsheetApp.getActive().getSpreadsheetTimeZone();
   const refs = {};
@@ -207,7 +213,11 @@ function readSiTabs_() {
   Object.keys(SI_TABS).forEach(function (company) {
     const texts = [];
     const rows = [];
-    SI_TABS[company].forEach(function (name) {
+    const drTabs = (DR_TABS[company] || []).filter(function (name) {
+      return !!SpreadsheetApp.getActive().getSheetByName(name);
+    });
+    SI_TABS[company].concat(drTabs).forEach(function (name) {
+      const isSi = SI_TABS[company].indexOf(name) >= 0;
       const sheet = tab_(name);
       const found = findSiColumns_(sheet);
       const cols = found.cols;
@@ -228,9 +238,10 @@ function readSiTabs_() {
         const invoiceNo = shown[r][cols.invoiceNo].trim();
         const supplier = shown[r][cols.supplier].trim();
         const gross = shown[r][cols.gross].trim();
-        texts.push(shown[r][cols.paymentDetails]);
+        if (isSi) texts.push(shown[r][cols.paymentDetails]);
         if (!invoiceNo && !supplier && !gross) continue;
         rows.push({
+          tab: name,
           row: r + 1,
           date: dateOf(dateCol),
           invoiceNo: invoiceNo,
@@ -428,7 +439,7 @@ function menuGiveExistingIds() {
 function watched_() {
   let names = [TAB];
   Object.keys(SI_TABS).forEach(function (company) {
-    names = names.concat(SI_TABS[company]);
+    names = names.concat(SI_TABS[company], DR_TABS[company] || []);
   });
   return names;
 }

@@ -5,11 +5,14 @@ import type { Trading } from "./projection";
 import { parseSheetDate } from "./sheet-rows";
 import type { Sql } from "./sql";
 
-// Each company's SI tab from the sheet: one row per supplier invoice, with the cheque that paid it
-// named in "Payment Details". Replaced on every sync; used only to suggest a voucher's lines.
+// Each company's SI and DR tabs from the sheet: one row per supplier invoice or delivery receipt,
+// with the cheque that paid it named in "Payment Details". Replaced on every sync; used only to
+// suggest a voucher's lines.
 
 export type InvoiceRow = {
   company: Trading;
+  /** The sheet tab the row is on ("" from an older sheet script). */
+  tab: string;
   row: number;
   invoiceDate: string;
   invoiceNo: string;
@@ -42,6 +45,7 @@ export function readInvoiceRows(company: Trading, raw: unknown): InvoiceRow[] {
     if (!invoiceNo && !supplier && gross === null) return;
     rows.push({
       company,
+      tab: text(r.tab),
       row: typeof r.row === "number" ? r.row : index + 2,
       invoiceDate: parseSheetDate(r.date) ?? "",
       invoiceNo,
@@ -57,6 +61,7 @@ export function readInvoiceRows(company: Trading, raw: unknown): InvoiceRow[] {
 
 const toRow = (r: Record<string, unknown>): InvoiceRow => ({
   company: r.company as Trading,
+  tab: r.tab as string,
   row: Number(r.row),
   invoiceDate: r.invoice_date as string,
   invoiceNo: r.invoice_no as string,
@@ -72,21 +77,21 @@ export async function replaceInvoices(sql: Sql, rows: InvoiceRow[]): Promise<voi
   await sql.query("DELETE FROM invoices");
   for (const r of rows) {
     await sql.query(
-      `INSERT INTO invoices (company, row, invoice_date, invoice_no, supplier, gross, payment_details, ewt, net)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       ON CONFLICT (company, row) DO UPDATE SET invoice_date = excluded.invoice_date, invoice_no = excluded.invoice_no,
+      `INSERT INTO invoices (company, tab, row, invoice_date, invoice_no, supplier, gross, payment_details, ewt, net)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       ON CONFLICT (company, tab, row) DO UPDATE SET invoice_date = excluded.invoice_date, invoice_no = excluded.invoice_no,
          supplier = excluded.supplier, gross = excluded.gross, payment_details = excluded.payment_details,
          ewt = excluded.ewt, net = excluded.net`,
-      [r.company, r.row, r.invoiceDate, r.invoiceNo, r.supplier, r.gross, r.paymentDetails, r.ewt, r.net],
+      [r.company, r.tab, r.row, r.invoiceDate, r.invoiceNo, r.supplier, r.gross, r.paymentDetails, r.ewt, r.net],
     );
   }
 }
 
 export async function listInvoices(sql: Sql, company: Trading): Promise<InvoiceRow[]> {
-  return (await sql.query<Record<string, unknown>>("SELECT * FROM invoices WHERE company = $1 ORDER BY row", [company])).map(toRow);
+  return (await sql.query<Record<string, unknown>>("SELECT * FROM invoices WHERE company = $1 ORDER BY tab, row", [company])).map(toRow);
 }
 
-/** The invoices this cheque pays, from its own company's tab, in sheet order. */
+/** The invoices this cheque pays, from its own company's tabs, in sheet order within each tab. */
 export async function invoicesForCheque(sql: Sql, company: Trading, chequeNo: string): Promise<InvoiceRow[]> {
   if (!chequeNo) return [];
   return (await listInvoices(sql, company)).filter((r) => mentionsNumber(r.paymentDetails, chequeNo));

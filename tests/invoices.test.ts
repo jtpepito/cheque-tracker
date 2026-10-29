@@ -37,7 +37,7 @@ describe("readInvoiceRows", () => {
   it("reads a row with typed amounts and dates", () => {
     expect(readInvoiceRows("wythlae", [raw()])).toEqual([
       {
-        company: "wythlae", row: 2, invoiceDate: "2026-01-07", invoiceNo: "52089", supplier: "Sample Ingredients Inc.",
+        company: "wythlae", tab: "", row: 2, invoiceDate: "2026-01-07", invoiceNo: "52089", supplier: "Sample Ingredients Inc.",
         gross: 65280, paymentDetails: "CBC 642848 75,079.61", ewt: 582.86, net: 64697.14,
       },
     ]);
@@ -54,6 +54,9 @@ describe("readInvoiceRows", () => {
   it("drops a figure too large for the database instead of failing the whole sync", () => {
     const [r] = readInvoiceRows("wwj", [raw({ gross: 1e13, net: "9,999,999,999,999" })]);
     expect(r).toMatchObject({ gross: null, net: null });
+  });
+  it("keeps the tab a row came from", () => {
+    expect(readInvoiceRows("wwjcorp", [raw({ tab: "WWJ CORP DR" })])[0].tab).toBe("WWJ CORP DR");
   });
   it("returns nothing for input that is not a list", () => {
     expect(readInvoiceRows("wwj", "x")).toEqual([]);
@@ -80,5 +83,18 @@ describe("invoices store", () => {
     expect(await invoicesForCheque(sql, "wwjcorp", "642848")).toEqual([]);
     expect(await invoicesForCheque(sql, "wythlae", "")).toEqual([]);
     expect(await invoicesForCheque(sql, "wythlae", "4284")).toEqual([]);
+  });
+
+  it("keeps rows with the same row number on different tabs, so a cheque paid through a DR tab is found", async () => {
+    await replaceInvoices(sql, [
+      ...readInvoiceRows("wwjcorp", [
+        raw({ tab: "WWJ Corp SI", row: 20, invoiceNo: "111", paymentDetails: "WWJ CBC 667011 1.00" }),
+        raw({ tab: "WWJ CORP DR", row: 20, invoiceNo: "", gross: 155000, ewt: "", net: "", paymentDetails: "CBC CORP 652503 155,000" }),
+      ]),
+    ]);
+    expect(await listInvoices(sql, "wwjcorp")).toHaveLength(2);
+    expect(await invoicesForCheque(sql, "wwjcorp", "CORP 652503")).toMatchObject([
+      { tab: "WWJ CORP DR", row: 20, invoiceNo: "", gross: 155000, ewt: null, net: null },
+    ]);
   });
 });
