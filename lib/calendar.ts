@@ -16,11 +16,20 @@ export type DayTotal = {
   items: DayItem[];
 };
 
-export type DayItem = { company: Company; chequeNo: string; payee: string; amount: number | null };
+export type DayItem = {
+  company: Company;
+  chequeNo: string;
+  payee: string;
+  amount: number | null;
+  /** Set on a cheque from before today that has not cleared: its own date ("" when it has none). */
+  from: string | null;
+};
 
 /**
  * Totals of issued cheques per clearing day for `days` days starting today. A cheque dated on a
- * weekend or holiday counts on the next banking day.
+ * weekend or holiday counts on the next banking day. A cheque from before today that is still
+ * issued (or has no date) can be presented any day, so it counts on the first banking day of the
+ * window, marked with its own date.
  */
 export function buildCalendar(cheques: Cheque[], today: string, holidays: Holiday[] = [], days = 14): DayTotal[] {
   const holidayDates = new Set(holidays.map((h) => h.date));
@@ -28,9 +37,11 @@ export function buildCalendar(cheques: Cheque[], today: string, holidays: Holida
     .filter((c) => c.status === "issued")
     .map((c) => ({ ...c, clears: clearingDate(c.issueDate, holidayDates) }));
   const soonUntil = clearingDate(addDays(today, 2), holidayDates);
+  const firstBankingDay = clearingDate(today, holidayDates);
+  const isEarlier = (clears: string) => clears === "" || clears < today;
   return Array.from({ length: days }, (_, i) => {
     const date = addDays(today, i);
-    const onDay = issued.filter((c) => c.clears === date);
+    const onDay = issued.filter((c) => (isEarlier(c.clears) ? date === firstBankingDay : c.clears === date));
     const byCompany = Object.fromEntries(
       COMPANIES.map((co) => [co, sumAmounts(onDay.filter((c) => c.company === co).map((c) => c.amount))]),
     ) as Record<Company, number>;
@@ -45,7 +56,13 @@ export function buildCalendar(cheques: Cheque[], today: string, holidays: Holida
         onDay
           .filter((c) => c.company === co)
           .sort((a, b) => a.chequeNo.localeCompare(b.chequeNo, "en", { numeric: true }))
-          .map((c) => ({ company: co, chequeNo: c.chequeNo, payee: c.payee, amount: c.amount })),
+          .map((c) => ({
+            company: co,
+            chequeNo: c.chequeNo,
+            payee: c.payee,
+            amount: c.amount,
+            from: isEarlier(c.clears) ? c.issueDate : null,
+          })),
       ),
     };
   });

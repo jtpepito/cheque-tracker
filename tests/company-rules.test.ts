@@ -14,6 +14,14 @@ describe("deriveCompany", () => {
     expect(deriveCompany("wythlae 100200", "Sample", {})).toEqual({ company: "wythlae", basis: "checkno-label" });
   });
 
+  it("puts any cheque no. containing CORP under WWJ Corp", () => {
+    expect(deriveCompany("CORP 652506", "Sample", {})).toEqual({ company: "wwjcorp", basis: "checkno-label" });
+    expect(deriveCompany("corp652506", "Wythlae Supplier", si)).toEqual({ company: "wwjcorp", basis: "checkno-label" });
+    expect(deriveCompany("Corp-652506", "Sample", {})).toEqual({ company: "wwjcorp", basis: "checkno-label" });
+    // Only the cheque no. counts: a supplier called "... Corp" says nothing about who wrote the cheque.
+    expect(deriveCompany("652506", "Sample Trading Corp", {})).toEqual({ company: "unassigned", basis: "none" });
+  });
+
   it("tests WWJ Corp before WWJ", () => {
     expect(deriveCompany("WWJ Corp 667011", "Sample", {})).toEqual({ company: "wwjcorp", basis: "checkno-label" });
     expect(deriveCompany("123456", "SBC - WWJCORP CBC", {})).toEqual({ company: "wwjcorp", basis: "supplier-label" });

@@ -35,7 +35,8 @@ export function deriveCompany(
   supplier: string,
   siRefs: SiRefs,
 ): { company: Company; basis: "checkno-label" | "supplier-label" | "si-crossref" | "none" } {
-  const inChequeNo = named(chequeNo);
+  // The owner's rule: a cheque no. with CORP in it is always WWJ Corp's.
+  const inChequeNo = /corp/i.test(chequeNo) ? "wwjcorp" : named(chequeNo);
   if (inChequeNo) return { company: inChequeNo, basis: "checkno-label" };
   const inSupplier = named(supplier);
   if (inSupplier) return { company: inSupplier, basis: "supplier-label" };

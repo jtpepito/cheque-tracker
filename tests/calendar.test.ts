@@ -31,12 +31,38 @@ describe("buildCalendar", () => {
     expect(day.byCompany).toEqual({ wwj: 3000.3, wythlae: 0, wwjcorp: 0, unassigned: 50 });
   });
 
-  it("ignores cheques dated before today or after the window", () => {
-    const days = buildCalendar(
-      [cheque({ issueDate: "2026-10-02" }), cheque({ issueDate: "2026-10-17" })],
-      TODAY,
-    );
+  it("ignores cheques after the window", () => {
+    const days = buildCalendar([cheque({ issueDate: "2026-10-17" })], TODAY);
     expect(days.every((d) => d.total === 0)).toBe(true);
+  });
+
+  it("puts issued cheques from before today on today, marked with their own date, since they can still be presented", () => {
+    const days = buildCalendar(
+      [
+        cheque({ issueDate: "2026-10-06", company: "wwjcorp", chequeNo: "CORP 652506", amount: 70 }),
+        cheque({ issueDate: "2026-10-07", company: "wwjcorp", chequeNo: "CORP 652507", amount: 30 }),
+        cheque({ issueDate: "", company: "wwj", chequeNo: "500", amount: 5 }),
+        cheque({ issueDate: "2026-10-06", company: "wwj", status: "cleared", amount: 999 }),
+      ],
+      "2026-10-07",
+    );
+    expect(days[0]).toMatchObject({ date: "2026-10-07", total: 105, count: 3 });
+    expect(days[0].byCompany).toEqual({ wwj: 5, wythlae: 0, wwjcorp: 100, unassigned: 0 });
+    expect(days[0].items).toEqual([
+      { company: "wwj", chequeNo: "500", payee: "Sample Supplier", amount: 5, from: "" },
+      { company: "wwjcorp", chequeNo: "CORP 652506", payee: "Sample Supplier", amount: 70, from: "2026-10-06" },
+      { company: "wwjcorp", chequeNo: "CORP 652507", payee: "Sample Supplier", amount: 30, from: null },
+    ]);
+    expect(days.slice(1).every((d) => d.total === 0)).toBe(true);
+  });
+
+  it("puts earlier cheques on the first banking day when today has no clearing", () => {
+    // 3 Oct 2026 is a Saturday: a cheque from Friday 2 Oct shows on Monday 5 Oct.
+    const days = buildCalendar([cheque({ issueDate: "2026-10-02", amount: 12 })], TODAY);
+    expect(days[0].total).toBe(0);
+    expect(days[2]).toMatchObject({ date: "2026-10-05", total: 12, count: 1 });
+    expect(days[2].items[0].from).toBe("2026-10-02");
+    expect(dueSoon(days).map((d) => d.date)).toEqual(["2026-10-05"]);
   });
 
   it("counts a cheque with no amount but adds zero", () => {
@@ -117,9 +143,9 @@ describe("buildCalendar: the cheques on each day", () => {
       TODAY,
     );
     expect(days[2].items).toEqual([
-      { company: "wwj", chequeNo: "653507", payee: "Sample A", amount: 100 },
-      { company: "wwj", chequeNo: "653520", payee: "Sample B", amount: 200 },
-      { company: "unassigned", chequeNo: "WWJ1", payee: "Sample C", amount: null },
+      { company: "wwj", chequeNo: "653507", payee: "Sample A", amount: 100, from: null },
+      { company: "wwj", chequeNo: "653520", payee: "Sample B", amount: 200, from: null },
+      { company: "unassigned", chequeNo: "WWJ1", payee: "Sample C", amount: null, from: null },
     ]);
     expect(days[0].items).toEqual([]);
   });
