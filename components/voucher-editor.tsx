@@ -25,10 +25,14 @@ type Draft = {
 };
 
 const money = (n: number | null) => (n === null ? "" : String(n));
-const toDraft = (v: Voucher): Draft => ({
+// A line saved without an invoice number shows the cheque's "CR No./ SI No." note instead (the
+// supplier's document number, e.g. "AGC No. 011588"); saving keeps it.
+const toDraft = (v: Voucher, fallbackNo = ""): Draft => ({
   voucherDate: v.voucherDate, payee: v.payee, amount: String(v.amount), preparedBy: v.preparedBy, checkedBy: v.checkedBy,
   approvedBy: v.approvedBy, receivedBy: v.receivedBy, notes: v.notes,
-  lines: v.lines.map((l) => ({ invoiceNo: l.invoiceNo, invoiceDate: l.invoiceDate, description: l.description, gross: money(l.gross), ewt: money(l.ewt), net: money(l.net) })),
+  lines: v.lines.map((l) => ({
+    invoiceNo: l.invoiceNo || fallbackNo.trim(), invoiceDate: l.invoiceDate, description: l.description, gross: money(l.gross), ewt: money(l.ewt), net: money(l.net),
+  })),
 });
 const blankLine = (): LineDraft => ({ invoiceNo: "", invoiceDate: "", description: "", gross: "", ewt: "", net: "" });
 // The same reading as the server's, so the preview never shows a figure the save would refuse.
@@ -46,7 +50,11 @@ export function VoucherEditor({ id }: { id: string }) {
     api<View>(`/api/vouchers/${id}`).then(
       (v) => {
         setView(v);
-        setDraft(toDraft(v.voucher));
+        const note = v.cheque?.particulars ?? "";
+        setDraft(toDraft(v.voucher, note));
+        if (note && v.voucher.lines.some((l) => !l.invoiceNo)) {
+          setMessage({ kind: "ok", text: `Lines with no invoice number show the cheque's note "${note}". Save to keep it.` });
+        }
       },
       (err) => setMessage({ kind: "error", text: err instanceof ApiError ? err.message : "Couldn't load the voucher." }),
     );
@@ -75,7 +83,7 @@ export function VoucherEditor({ id }: { id: string }) {
     try {
       const saved = await api<Voucher>(`/api/vouchers/${id}`, "PUT", draft);
       setView({ ...view!, voucher: saved });
-      setDraft(toDraft(saved));
+      setDraft(toDraft(saved, view!.cheque?.particulars ?? ""));
       setMessage({ kind: "ok", text: "Saved." });
       setBusy(false);
       return true;
