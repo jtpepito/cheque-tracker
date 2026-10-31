@@ -20,7 +20,9 @@ export function GET(_req: Request, { params }: Params) {
     const [names, details] = await Promise.all([getCompanyNames(sql), getCompanyDetails(sql)]);
     return NextResponse.json({
       voucher,
-      cheque: cheque ? { chequeNo: cheque.chequeNo, bankAccount: cheque.bankAccount, issueDate: cheque.issueDate, status: cheque.status } : null,
+      cheque: cheque
+        ? { chequeNo: cheque.chequeNo, bankAccount: cheque.bankAccount, issueDate: cheque.issueDate, status: cheque.status, particulars: cheque.particulars }
+        : null,
       companyName: companyLabel(names, voucher.company),
       details: details[voucher.company],
     });

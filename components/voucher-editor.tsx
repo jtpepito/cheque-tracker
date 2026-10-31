@@ -13,7 +13,7 @@ import { amountInWords } from "@/lib/words";
 
 type View = {
   voucher: Voucher;
-  cheque: { chequeNo: string; bankAccount: string; issueDate: string; status: Status } | null;
+  cheque: { chequeNo: string; bankAccount: string; issueDate: string; status: Status; particulars: string } | null;
   companyName: string;
   details: { address: string; tin: string };
 };
@@ -284,6 +284,8 @@ export function VoucherEditor({ id }: { id: string }) {
             <span className="text-neutral-600">Cheque no.</span> {cheque.chequeNo || "—"}
             {cheque.bankAccount ? <> · {cheque.bankAccount}</> : null}
             {cheque.issueDate ? <> · dated {shortDate(cheque.issueDate)} {cheque.issueDate.slice(0, 4)}</> : null}
+            {/* The sheet's "CR No./ SI No." note, e.g. the supplier's own invoice or DR number. */}
+            {cheque.particulars ? <> · Ref. {cheque.particulars}</> : null}
           </p>
         )}
         <table className="w-full border-collapse text-[11px]">
