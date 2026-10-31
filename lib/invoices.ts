@@ -91,8 +91,14 @@ export async function listInvoices(sql: Sql, company: Trading): Promise<InvoiceR
   return (await sql.query<Record<string, unknown>>("SELECT * FROM invoices WHERE company = $1 ORDER BY tab, row", [company])).map(toRow);
 }
 
-/** The invoices this cheque pays, from its own company's tabs, in sheet order within each tab. */
-export async function invoicesForCheque(sql: Sql, company: Trading, chequeNo: string): Promise<InvoiceRow[]> {
+/**
+ * The invoices this cheque pays, from its own company's tabs, in sheet order within each tab.
+ * A row with no invoice number of its own takes `fallbackNo`: the cheque's "CR No./ SI No." note,
+ * which is where staff write the supplier's document number (e.g. "AGC No. 011588") for DR rows.
+ */
+export async function invoicesForCheque(sql: Sql, company: Trading, chequeNo: string, fallbackNo = ""): Promise<InvoiceRow[]> {
   if (!chequeNo) return [];
-  return (await listInvoices(sql, company)).filter((r) => mentionsNumber(r.paymentDetails, chequeNo));
+  return (await listInvoices(sql, company))
+    .filter((r) => mentionsNumber(r.paymentDetails, chequeNo))
+    .map((r) => (r.invoiceNo ? r : { ...r, invoiceNo: fallbackNo.trim() }));
 }

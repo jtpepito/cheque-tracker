@@ -97,4 +97,16 @@ describe("invoices store", () => {
       { tab: "WWJ CORP DR", row: 20, invoiceNo: "", gross: 155000, ewt: null, net: null },
     ]);
   });
+
+  it("gives a row with no invoice number the cheque's own note, and leaves a numbered row alone", async () => {
+    await replaceInvoices(sql, [
+      ...readInvoiceRows("wwjcorp", [
+        raw({ tab: "WWJ CORP DR", row: 20, invoiceNo: "", paymentDetails: "CBC CORP 652503 155,000" }),
+        raw({ tab: "WWJ Corp SI", row: 21, invoiceNo: "111", paymentDetails: "CBC CORP 652503 1.00" }),
+      ]),
+    ]);
+    const rows = await invoicesForCheque(sql, "wwjcorp", "CORP 652503", " AGC No. 011588 ");
+    expect(rows.map((r) => r.invoiceNo)).toEqual(["AGC No. 011588", "111"]);
+    expect((await invoicesForCheque(sql, "wwjcorp", "CORP 652503")).map((r) => r.invoiceNo)).toEqual(["", "111"]);
+  });
 });

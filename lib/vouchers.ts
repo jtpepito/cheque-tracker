@@ -159,7 +159,7 @@ export async function createVoucherForCheque(
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, $9, $10)`,
       [id, number, company, chequeId, today, cheque.payee, cheque.amount ?? 0, now, by, by ?? ""],
     );
-    const invoices = await invoicesForCheque(t, company, cheque.cheque_no as string);
+    const invoices = await invoicesForCheque(t, company, cheque.cheque_no as string, cheque.particulars as string);
     await insertLines(
       t,
       id,

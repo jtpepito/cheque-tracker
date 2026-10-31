@@ -15,6 +15,6 @@ export function GET(req: Request) {
     const cheque = (await listCheques(sql)).find((c) => c.id === chequeId);
     if (!cheque) return badRequest("This cheque no longer exists.");
     if (!TRADING.includes(cheque.company as Trading)) return badRequest("Choose a company for this cheque first.");
-    return NextResponse.json(await invoicesForCheque(sql, cheque.company as Trading, cheque.chequeNo));
+    return NextResponse.json(await invoicesForCheque(sql, cheque.company as Trading, cheque.chequeNo, cheque.particulars));
   });
 }
