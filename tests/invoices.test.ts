@@ -58,6 +58,11 @@ describe("readInvoiceRows", () => {
   it("keeps the tab a row came from", () => {
     expect(readInvoiceRows("wwjcorp", [raw({ tab: "WWJ CORP DR" })])[0].tab).toBe("WWJ CORP DR");
   });
+  it("caps each cell's text, with more room for Payment Details", () => {
+    const long = "x".repeat(5000);
+    const [r] = readInvoiceRows("wwj", [raw({ invoiceNo: long, supplier: long, tab: long, paymentDetails: long })]);
+    expect([r.invoiceNo.length, r.supplier.length, r.tab.length, r.paymentDetails.length]).toEqual([200, 200, 200, 1000]);
+  });
   it("returns nothing for input that is not a list", () => {
     expect(readInvoiceRows("wwj", "x")).toEqual([]);
   });

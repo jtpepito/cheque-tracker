@@ -2,7 +2,7 @@ import "server-only";
 import { mentionsNumber } from "./company-rules";
 import { parseBalance } from "./money";
 import type { Trading } from "./projection";
-import { parseSheetDate } from "./sheet-rows";
+import { MAX_SHEET_TEXT, parseSheetDate } from "./sheet-rows";
 import type { Sql } from "./sql";
 
 // Each company's SI and DR tabs from the sheet: one row per supplier invoice or delivery receipt,
@@ -23,7 +23,9 @@ export type InvoiceRow = {
   net: number | null;
 };
 
-const text = (v: unknown) => (v == null ? "" : String(v).trim());
+// Payment Details may list several payments, so it gets more room than the other cells.
+const MAX_PAYMENT_DETAILS = 1000;
+const text = (v: unknown, max = MAX_SHEET_TEXT) => (v == null ? "" : String(v).trim().slice(0, max));
 
 /** A money cell: a number, or text like "₱582.86"; blank or unreadable becomes null. */
 function money(v: unknown): number | null {
@@ -51,7 +53,7 @@ export function readInvoiceRows(company: Trading, raw: unknown): InvoiceRow[] {
       invoiceNo,
       supplier,
       gross,
-      paymentDetails: text(r.paymentDetails),
+      paymentDetails: text(r.paymentDetails, MAX_PAYMENT_DETAILS),
       ewt: money(r.ewt),
       net: money(r.net),
     });

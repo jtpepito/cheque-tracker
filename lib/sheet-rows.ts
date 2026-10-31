@@ -32,7 +32,9 @@ export type ReadRow = {
 
 export type RowProblem = { row: number; id: string; reason: string };
 
-const text = (v: unknown) => (v == null ? "" : String(v).trim());
+/** Text from a sheet cell, capped like the app's own fields so a runaway cell cannot swell the database or a printout. */
+export const MAX_SHEET_TEXT = 200;
+const text = (v: unknown) => (v == null ? "" : String(v).trim().slice(0, MAX_SHEET_TEXT));
 
 /** "YYYY-MM-DD", or M/D/YY or M/D/YYYY as typed in the sheet. Null when it is not a date. */
 export function parseSheetDate(raw: unknown): string | null {

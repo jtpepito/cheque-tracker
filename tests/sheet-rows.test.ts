@@ -66,6 +66,12 @@ describe("readRow", () => {
     });
   });
 
+  it("caps each cell's text at 200 characters", () => {
+    const long = "y".repeat(5000);
+    const r = readRow(row({ supplier: long, reference: long, chequeNo: long }), 0);
+    expect(r.ok && [r.value.payee.length, r.value.particulars.length, r.value.chequeNo.length]).toEqual([200, 200, 200]);
+  });
+
   it("reads an amount typed as text and a date typed as text", () => {
     const r = readRow(row({ amount: "₱16,882.63", chequeDate: "12/10/25" }), 0);
     expect(r.ok && r.value.amount).toBe(16882.63);
